@@ -15,7 +15,7 @@ import { dist, clamp, maxBy, rand, shellArcH } from './geometry';
 import { damageEnemy, knockback, addEffect, shellHit, addZone } from './combat';
 import { airborne } from './skills';
 import { SPECIALS, isTile } from '../data/specials';
-import { drumRate } from './items';
+import { speedRate } from './items';
 import type { FuMech } from '../data/fu';
 
 export interface PieceStats { dmg: number; cd: number; range: number; area: number; }
@@ -214,7 +214,7 @@ export function updatePieces(dt: number): void {
       continue;
     }
 
-    if (p.cd > 0) p.cd -= dt * drumRate();   // 擂鼓期间全军冷却加速
+    if (p.cd > 0) p.cd -= dt * speedRate(p);   // 攻速总倍率:擂鼓 / 大纛光环 / 背水一战
     if (p.cd > 0) continue;
     // 攻击位:单格=格心;双格特殊军=两格连线中点(炮口/起跳/践踏都从这出)
     const pos = p.vec

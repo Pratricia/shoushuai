@@ -3,7 +3,7 @@
    ============================================================ */
 import { ctx, rr, setFont } from '../canvas';
 import { TAU, PAPER, INK, BARRACKS, DRAFT_BTN, RECYCLE_BTN, KEN_BTN, BAG_BTN, sellValue } from '../config';
-import { state, slotCenter } from '../state';
+import { state, slotCenter, boardGear } from '../state';
 import { draftCost } from '../systems/economy';
 import { endlessWaveInfo } from '../systems/waves';
 import { LEVELS } from '../data/levels';
@@ -52,6 +52,22 @@ export function drawSpeedBtn(cx: number, cy: number, r: number, hit: UIButton): 
 /** 帅(路径终点,大棋子坐镇朱漆帅台之上)+ 帅血(居中于帅下方) */
 export function drawShuai(): void {
   const s = state.map.shuai;
+  // 军械·中军大纛:帅旁光环——地面光晕先铺,棋子/敌军压在圈上面(不遮任何东西)
+  const da = boardGear('da') ? gearOf('da')?.fx : undefined;
+  if (da?.auraR && da.auraRate) {
+    const g = ctx.createRadialGradient(s.x, s.y, da.auraR * 0.3, s.x, s.y, da.auraR);
+    g.addColorStop(0, 'rgba(249,168,37,0.13)');
+    g.addColorStop(1, 'rgba(249,168,37,0)');
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, da.auraR, 0, TAU);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.setLineDash([12, 9]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(201,162,39,0.45)';
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   // 大棋子本体(圆形木面棋子:金刻环)
   discBase(s.x, s.y, 44, '#b8860b', 3.5);
   // 内环描红(帅的双环贵气)
@@ -65,6 +81,16 @@ export function drawShuai(): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('帅', s.x, s.y + 2);
+  // 军械·背水一战:帅血告急时帅身红环脉动(状态一眼可见,不靠飘字猜)
+  const bei = boardGear('bei') ? gearOf('bei')?.fx : undefined;
+  if (bei && state.hearts <= (bei.desperateAt ?? 1)) {
+    const k = (Math.sin(state.levelT * 6) + 1) / 2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 50 + k * 7, 0, TAU);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(239,108,0,' + (0.35 + k * 0.45).toFixed(2) + ')';
+    ctx.stroke();
+  }
   // 帅血(只画当前余量;暗色描边光晕——朱漆台/暗堤/谷地任何底色上都清晰)
   const hy = s.y + 78;
   setFont(26, false);

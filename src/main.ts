@@ -9,7 +9,7 @@ import { updateBoats, sendBoat } from './systems/navy';
 import { updatePieces, updateProjectiles } from './systems/pieces';
 import { updateTimers, updateToast, damageEnemy, updateZones } from './systems/combat';
 import { tryDraft } from './systems/economy';
-import { useGear, drumRate, tickGear, onWaveStart } from './systems/items';
+import { useGear, drumRate, speedRate, tickGear, onWaveStart, onGroundOpened } from './systems/items';
 import { updateDuel, duelManualBoat, duelFieldCount } from './systems/duel';
 import { saveData, awardCampaign, awardEndless, awardDuel, resetSave, bagList, bagActiveCount, passiveList, passiveCarryCount, passiveOwnedCount, carriesGear,
   ownsGear, inBag, unlockGear, equipGear, unequipGear, equipPassive, unequipPassive, addShards, craftFu, fuOf,
@@ -161,7 +161,7 @@ window.__game = {
   handleDown, endDrag, spawnEnemy, cycleSpeed, sendBoat,
   duelApi: { manualBoat: duelManualBoat, fieldCount: duelFieldCount, presets: AI_PRESETS },
   getPaths: () => state.paths, getBlocked: () => state.blocked,
-  items: { useGear, drumRate, tickGear, onWaveStart },
+  items: { useGear, drumRate, speedRate, tickGear, onWaveStart, onGroundOpened },
   shop: { scrollShop, getShopScroll, getShopListRect, resetShopScroll, move: shopPointerMove, up: shopPointerUp },
   save: { data: saveData, awardCampaign, awardEndless, awardDuel, resetSave,
     bagList, bagActiveCount, passiveList, passiveCarryCount, passiveOwnedCount, carriesGear, ownsGear, inBag,

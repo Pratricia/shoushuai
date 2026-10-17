@@ -13,6 +13,7 @@
    ============================================================ */
 import type { Boat, GameState, Piece, PieceType, Point, TileType } from '../types';
 import { state, duel, cellCenter, setBoard, boardGear } from '../state';
+import { onGroundOpened } from './items';
 import { DUEL, NAVY, W, MAXLV, MERGE, sellValue, PIECES, GROWTH } from '../config';
 import { SPECIALS, isTile } from '../data/specials';
 import type { AiPreset } from '../data/ai';
@@ -348,7 +349,11 @@ function aiDeployBase(p: Piece, preset: AiPreset, cap: number): boolean {
   if (!spot && aiRecycleWeakest(preset, p)) spot = aiBestCell(p, preset, cap);
   if (!spot) return false;
   const key = spot.c + ',' + spot.r;
-  if (r.wasteland.has(key)) r.wasteland.delete(key);   // 垦荒:这一格是它自己要的,半场上的「荒」封印随之少一枚
+  if (r.wasteland.has(key)) {
+    r.wasteland.delete(key);   // 垦荒:这一格是它自己要的,半场上的「荒」封印随之少一枚
+    const cc = cellCenter(spot.c, spot.r);
+    onGroundOpened(cc.x, cc.y);   // 屯田令:对方若抽到也照结(同一套规则)
+  }
   const pc: Piece = { ...p, c: spot.c, r: spot.r, cd: 0, stunT: 0 };
   r.grid.set(key, pc);
   checkFusions({ c: spot.c, r: spot.r });
@@ -402,7 +407,11 @@ function aiDeployTile(p: Piece, preset: AiPreset, cap: number, immediate: boolea
   if (!best) return false;
   if (cellCount(r) >= cap && !aiRecycleWeakest(preset, p)) return false;   // 地皮满:腾位或作罢
   const bk = best.c + ',' + best.r;
-  if (r.wasteland.has(bk)) r.wasteland.delete(bk);    // 开垦:这一格给字牌落脚,半场的「荒」封印随之少一枚
+  if (r.wasteland.has(bk)) {
+    r.wasteland.delete(bk);    // 开垦:这一格给字牌落脚,半场的「荒」封印随之少一枚
+    const cc = cellCenter(best.c, best.r);
+    onGroundOpened(cc.x, cc.y);   // 屯田令:对方若抽到也照结(同一套规则)
+  }
   const pc: Piece = { ...p, c: best.c, r: best.r, cd: 0, stunT: 0 };
   r.grid.set(bk, pc);
   checkFusions({ c: best.c, r: best.r });

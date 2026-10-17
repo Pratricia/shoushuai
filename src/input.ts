@@ -18,7 +18,7 @@ import { isTile } from './data/specials';
 import { GEAR, gearOf } from './data/shop';
 import { FUS } from './data/fu';
 import { saveData, ownsGear, inBag, bagActiveCount, passiveCarryCount, carriesGear, unlockGear, equipGear, unequipGear, equipPassive, unequipPassive, craftFu } from './save';
-import { useGear } from './systems/items';
+import { useGear, onGroundOpened } from './systems/items';
 import { duelManualBoat } from './systems/duel';
 import { setShopTab, scrollShop, resetShopScroll, getShopListRect } from './render/overlays';
 import { toast, addEffect, addFloat } from './systems/combat';
@@ -756,6 +756,7 @@ function endKenDrag(p: Point): void {
       const cc = cellCenter(cell.c, cell.r);
       addEffect(cc.x, cc.y, 'stomp', 70);
       addFloat(cc.x, cc.y - 50, '垦荒 · 新阵地', '#2e7d32', 24);
+      onGroundOpened(cc.x, cc.y);   // 军械·屯田令:开垦即得粮(不带则无事发生)
       return;
     }
     toast(state.blocked.has(key) ? '道路上无法开垦' : '此格已开垦');

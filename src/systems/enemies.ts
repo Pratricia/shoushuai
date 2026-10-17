@@ -2,7 +2,7 @@
    敌军系统:出怪 + 沿路径行军(抵达帅即砍帅)+ Boss 主动技能
    ============================================================ */
 import type { Enemy, EnemyType, Piece, BossDef, Point } from '../types';
-import { state, cellCenter } from '../state';
+import { state, cellCenter, boardGear } from '../state';
 import { ENEMIES, SHELL, TIDE, ENDLESS, DUEL } from '../config';
 import { findSkill, immuneSacrifice, slowImmune, rageMul, airborne } from './skills';
 import { rand, dist, clamp } from './geometry';
@@ -389,6 +389,14 @@ export function marchEnemies(dt: number): void {
       state.hearts -= e.dmg;
       addEffect(shuai.x, shuai.y - 6, 'palace', 0);
       addFloat(shuai.x, shuai.y - 50, '-' + e.dmg, '#a93226', 26);
+      // 军械·免死符:致命一击改为留在 1 血(每局仅一次;对战双方各认自己的武装册)
+      if (state.hearts <= 0 && boardGear('mian') && !state.revived) {
+        state.revived = true;
+        state.hearts = 1;
+        addEffect(shuai.x, shuai.y - 6, 'palace', 90);
+        addFloat(shuai.x, shuai.y - 84, '免死符!帅旗不倒', '#f9a825', 28);
+        continue;   // 该敌已 dead:不结算殉局,本局余下照打
+      }
       if (state.hearts <= 0) {
         state.hearts = 0;
         // 无限模式殉局发饷:按活过波次计(大考波另加);战役重试不计饷

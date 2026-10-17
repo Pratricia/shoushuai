@@ -47,6 +47,7 @@ function initial(): GameState {
     enemies: [], boats: [], projectiles: [], shells: [], zones: [], effects: [], floats: [],
     waveIdx: -1, waveEvents: [], waveT: 0, interWave: 0,
     levelT: 0, tideTold: false,
+    revived: false, beiTold: false,
     speed: 1, paused: false, drag: null, toast: null,
     uiButtons: [],
   };
@@ -159,6 +160,8 @@ function resetBattle(map: MapDef, open: [number, number][], gold: number, hearts
   state.interWave = START_DELAY;   // 开局布阵缓冲:首波延迟出兵
   state.levelT = 0;
   state.tideTold = false;
+  state.revived = false;   // 免死符:每局重新拥有
+  state.beiTold = false;   // 背水一战:播报复位
   state.drag = null;
   state.toast = null;
   state.paused = false;

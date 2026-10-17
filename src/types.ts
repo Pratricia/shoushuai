@@ -323,6 +323,8 @@ export interface GameState {
   interWave: number;
   levelT: number;             // 关内游戏时间(秒,含倍速):敌潮成长的自变量
   tideTold: boolean;          // 敌潮强化首次提示已播(每关一次)
+  revived: boolean;           // 军械·免死符:本局已用掉免死(每局仅一次)
+  beiTold: boolean;           // 军械·背水一战:告急播报已发(脱离告急后复位)
   speed: number;
   paused: boolean;            // 暂停中(更新冻结)
   drag: DragState | null;
