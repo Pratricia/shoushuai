@@ -99,13 +99,6 @@ export function ownsGear(id: string): boolean {
   return (saveData.gear[id] ?? 0) > 0;
 }
 
-/** 已解锁军械数 */
-export function ownedCount(): number {
-  let n = 0;
-  for (const k in saveData.gear) if (saveData.gear[k] > 0) n++;
-  return n;
-}
-
 /** 已解锁的被动军械数(被动解锁即常驻,不占技能槽) */
 export function passiveCount(): number {
   let n = 0;

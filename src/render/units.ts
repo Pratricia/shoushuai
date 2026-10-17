@@ -1,7 +1,7 @@
 /* ============================================================
    渲染 · 单位:棋子、敌军、弹道、特效、飘字、提示条、拖拽预览
    ============================================================ */
-import type { Piece, TileType, Point, Enemy, Boat, Projectile, Effect, FloatText } from '../types';
+import type { Piece, TileType, Point, Enemy, Boat } from '../types';
 import { ctx, rr, setFont } from '../canvas';
 import { TAU, W, MAXLV, PIECES, TIER, SHELL, TIDE, NAVY, MERGE, xpNeed } from '../config';
 import { state, cellCenter, cellAt, slotCenter } from '../state';

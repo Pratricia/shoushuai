@@ -8,7 +8,7 @@
      车 charge —— 冲阵:直线冲出碾压撞飞;每中一敌减速,满 hitCap 提前折返
      相 stomp  —— 践踏:周身范围伤害 + 减速 + 推散
    ============================================================ */
-import type { Piece, PieceDef, PieceType, Enemy, Projectile, JumpState, ChargeState } from '../types';
+import type { Piece, PieceDef, PieceType, Enemy, JumpState, ChargeState } from '../types';
 import { state, cellCenter, boardFu } from '../state';
 import { PIECES, GROWTH, W, FU_MECH } from '../config';
 import { dist, clamp, maxBy, rand, shellArcH } from './geometry';
@@ -322,6 +322,3 @@ export function updateProjectiles(dt: number): void {
   }
   state.projectiles = state.projectiles.filter(p => !p.done);
 }
-
-/** (测试辅助)强制某棋子立即开火 */
-export function resetCd(p: Piece): void { p.cd = 0; }
