@@ -4,6 +4,11 @@
    拖拽规则:
      · 兵营 ⇄ 棋盘 双向拖动
      · 同类同级重叠 → 合成升 1 级(上限 Lv5;特殊军不参与,靠杀敌攒经验)
+     · 换位:目标格上是「不同种 / 不同级 / 字牌 / 另一支特殊军」时,落上去 = 两者位置对调
+       (同类同级仍是合成,没有「只换不合」的开关 —— 想挪位就借四邻一个空格周转)
+     · 两条旧死路已打通(玩家常只是想挪位置,不该被挡住):
+         ①特殊军 ⇄ 特殊军:整组对调 —— 两格换两格,四格恰好互相用满(见 swapTwoArmies)
+         ②字牌拖到普通子上、而它四邻已无空格:与那枚子对调(旧版只提示「贴不上去」)
      · 道路格不可布阵
      · 冲阵/连跳中的棋子被拿起则中断当前动作
      · 特殊军占两格(本体 + 副格,朝向成军时定):挪移时两格一起走,
@@ -204,6 +209,55 @@ function applyArmySwap(
     const cc = cellCenter(c, r), oc = cellCenter(first.p.c, first.p.r);
     swapFeedback(cc.x, cc.y, oc.x, oc.y);
   }
+}
+
+/** 两支特殊军整组对调:交换两个主格,副格各取「剩下的那一格」——
+ *  两军各占两格,四格恰好互相用满,所以这是一次**原地转身**而不是越挪越乱。
+ *  不变式「副格 = 主格 + vec」要求副格与主格**正交相邻**,故四个组合逐个试;
+ *  排序优先让「拖来的这支」保住原朝向(rank:拖来的权重 2、被压的那支权重 1)。
+ *  四格全不成立才作罢(交回调用方提示)——旧版这里是死路(「两对双格互绕太绕」),
+ *  可玩家常常只是想挪个位置,不该被挡住。落点必须是对方那两格之一。 */
+function swapTwoArmies(a: Piece, b: Piece, tc: number, tr: number): boolean {
+  const aMain = mainKey(a), aS = secKey(a);
+  const bMain = mainKey(b), bS = secKey(b);
+  if (!aS || !bS || !a.vec || !b.vec) return false;
+  const target = tc + ',' + tr;
+  const cells = [aMain, aS, bMain, bS];                 // 两军各占两格,互不重叠
+  if (!cells.includes(target)) return false;
+  const rest = cells.filter(k => k !== target && k !== aMain);
+  const parse = (k: string): [number, number] => [Number(k.split(',')[0]), Number(k.split(',')[1])];
+  const orth = (m: string, s: string): boolean => {
+    const [c, r] = parse(m), [cc, rr] = parse(s);
+    return Math.abs(cc - c) + Math.abs(rr - r) === 1;
+  };
+  const keeps = (main: string, v: { dc: number; dr: number }, cand: string): number => {
+    const [c, r] = parse(main), [cc, rr] = parse(cand);
+    return (cc - c === v.dc && rr - r === v.dr) ? 0 : 1;
+  };
+  const plans: { aSec: string; bSec: string; rank: number }[] = [];
+  for (const as of rest) {
+    for (const bs of rest) {
+      if (as === bs) continue;
+      if (!orth(target, as) || !orth(aMain, bs)) continue;
+      plans.push({ aSec: as, bSec: bs, rank: keeps(target, a.vec, as) * 2 + keeps(aMain, b.vec, bs) });
+    }
+  }
+  plans.sort((x, y) => x.rank - y.rank);
+  for (const pl of plans) {
+    // 地皮逐格按各自军种判(仕驻九宫的荒地特权随军走,不能拿 A 的规则放 B)
+    if (!freeGround(a, target) || !freeGround(a, pl.aSec)) continue;
+    if (!freeGround(b, aMain) || !freeGround(b, pl.bSec)) continue;
+    for (const k of cells) state.grid.delete(k);
+    const [ac, ar] = parse(aMain);
+    a.charge = null; a.jump = null;
+    b.charge = null; b.jump = null;
+    placeSpecialAt(a, tc, tr, pl.aSec);
+    placeSpecialAt(b, ac, ar, pl.bSec);
+    const cc = cellCenter(tc, tr), oc = cellCenter(ac, ar);
+    swapFeedback(cc.x, cc.y, oc.x, oc.y);
+    return true;
+  }
+  return false;
 }
 
 /** 字牌拖到别的棋子上时:吸附到该棋子四邻的空格(优先拖拽方向;没有空格返回 null)。
@@ -447,6 +501,39 @@ function swapFeedback(x1: number, y1: number, x2: number, y2: number): void {
   addEffect(x2, y2, 'dust', 24);
 }
 
+/** 换位:目标格上的子(occ)与手里这枚(pc)对调(普通 ⇄ 普通;字牌也走这条)。
+ *  两边都得站得住:仕不得换出九宫;被顶来的子也不得落进荒地
+ *  (仕驻宫内荒地时换位会把字牌/兵按在荒地上)。来的是兵营子 → 换出的子进那个空槽。
+ *  返回 false = 这次换不成立(调用方负责 restore + 提示)。 */
+function doSwap(pc: Piece, occ: Piece, cell: { c: number; r: number }, key: string, d: DragState): boolean {
+  if (d.from === 'grid') {
+    const src = d.c + ',' + d.r;
+    if (occ.type === '仕' && !state.palace.has(src)) {
+      toast('士不离宫:换位会让仕离开九宫');
+      return false;
+    }
+    if (!canReceive(occ, src)) {
+      toast('此处放不下换位');
+      return false;
+    }
+  }
+  occ.charge = null;
+  occ.jump = null;
+  pc.c = cell.c; pc.r = cell.r;
+  state.grid.set(key, pc);
+  if (d.from === 'grid') {
+    occ.c = d.c; occ.r = d.r;
+    state.grid.set(d.c + ',' + d.r, occ);
+  } else {
+    occ.c = -1; occ.r = -1;
+    state.barracks[d.idx] = occ;
+  }
+  const cc = cellCenter(cell.c, cell.r);
+  const org = d.from === 'grid' ? cellCenter(d.c, d.r) : slotCenter(d.idx);
+  swapFeedback(cc.x, cc.y, org.x, org.y);
+  return true;
+}
+
 /** 松手:垦荒令拖到荒地开辟 / 棋子落在回收键(卖子)/ 兵营 / 棋盘 / 无效区
  *  落定后统一扫一遍成军(字牌贴齐即并格,幂等;落子格作为朝向判定提示) */
 export function endDrag(p: Point): void {
@@ -494,9 +581,10 @@ function endDragInner(p: Point): void {
       return;
     }
     // 目标槽里是特殊军、拖来的子来自棋盘:军整支出到拖来那子腾出的格(两格对齐)。
-    // 双格军绝不能按单格塞进 grid —— 旧版这样写会丢掉副格登记(军只剩一格)
+    // 双格军绝不能按单格塞进 grid —— 旧版这样写会丢掉副格登记(军只剩一格)。
+    // 拖来的也是军时同样成立:这支进槽、槽里那支出到它腾出的两格 —— 两军对调
+    // (旧版这里直接 toast 挡住,但玩家常常只是想挪位置)
     if (d.from !== 'barracks' && isSpec(occ)) {
-      if (isSpec(pc)) { toast('两支特殊军无法换位'); restore(d); return; }
       const fit = fitSpecial(occ, d.c, d.r, new Set([mainKey(occ), secKey(occ) ?? '']));
       if (!fit) { toast('特殊军占两格 · 此处放不下'); restore(d); return; }
       occ.charge = null;
@@ -574,7 +662,14 @@ function endDragInner(p: Point): void {
         state.grid.set(spot.c + ',' + spot.r, pc);
         return;
       }
-      toast('这枚棋子四周没有空格 · 字牌贴不上去');
+      // 四邻真的没空格了:不再是死路 —— 直接与这枚子对调位置(牌贴不上去时,
+      // 玩家十有八九只是想挪个位置,尤其是想把子挪进这枚牌占着的开垦格)。
+      // 军占两格,牌 ⇄ 军 对调仍太绕,维持提示
+      if (!isSpec(occ)) {
+        if (!doSwap(pc, occ, cell, key, d)) restore(d);
+        return;
+      }
+      toast('特殊军四周没有空格 · 字牌贴不上去');
       restore(d);
       return;
     }
@@ -618,8 +713,24 @@ function endDragInner(p: Point): void {
       restore(d);
       return;
     }
-    // 特殊军之间不换位(两对双格互绕太绕,直接提示)
+    // 特殊军 ⇄ 特殊军:整组对调(两格换两格,四格互相用满 —— 见 swapTwoArmies)
     if (isSpec(pc) && isSpec(occ)) {
+      if (d.from === 'grid' && swapTwoArmies(pc, occ, cell.c, cell.r)) return;
+      // 手里这支来自兵营槽:盘上那支进槽,这支落到它腾出的两格(旧版这里直接挡死)
+      if (d.from === 'barracks') {
+        const fit = fitSpecial(pc, cell.c, cell.r, new Set([mainKey(occ), secKey(occ) ?? '']));
+        if (fit) {
+          state.grid.delete(mainKey(occ));
+          const occS = secKey(occ);
+          if (occS) state.grid.delete(occS);
+          occ.c = -1; occ.r = -1;
+          state.barracks[d.idx] = occ;
+          placeSpecialAt(pc, cell.c, cell.r, fit);
+          const cc = cellCenter(cell.c, cell.r), sc = slotCenter(d.idx);
+          swapFeedback(cc.x, cc.y, sc.x, sc.y);
+          return;
+        }
+      }
       toast('两支特殊军无法换位');
       restore(d);
       return;
@@ -710,35 +821,9 @@ function endDragInner(p: Point): void {
       swapFeedback(cc.x, cc.y, cellCenter(occC, occR).x, cellCenter(occC, occR).y);
       return;
     }
-    // 换位:目标格 ↔ 来源(普通 ⇄ 普通)。两边都得站得住:
-    //   仕不得换出九宫;被顶来的子也不得落进荒地(仕驻宫内荒地时换位会把字牌/兵按在荒地上)
-    if (d.from === 'grid') {
-      const src = d.c + ',' + d.r;
-      if (occ.type === '仕' && !state.palace.has(src)) {
-        toast('士不离宫:换位会让仕离开九宫');
-        restore(d);
-        return;
-      }
-      if (!canReceive(occ, src)) {
-        toast('此处放不下换位');
-        restore(d);
-        return;
-      }
-    }
-    occ.charge = null;
-    occ.jump = null;
-    pc.c = cell.c; pc.r = cell.r;
-    state.grid.set(key, pc);
-    if (d.from === 'grid') {
-      occ.c = d.c; occ.r = d.r;
-      state.grid.set(d.c + ',' + d.r, occ);
-    } else {
-      occ.c = -1; occ.r = -1;
-      state.barracks[d.idx] = occ;
-    }
-    const cc = cellCenter(cell.c, cell.r);
-    const org = d.from === 'grid' ? cellCenter(d.c, d.r) : slotCenter(d.idx);
-    swapFeedback(cc.x, cc.y, org.x, org.y);
+    // 换位:目标格 ↔ 来源(普通 ⇄ 普通 / 字牌 ⇄ 普通)。
+    // 细则都在 doSwap 里(字牌「四邻没空格」那条死路也复用它)
+    if (!doSwap(pc, occ, cell, key, d)) { restore(d); return; }
     return;
   }
 
