@@ -19,19 +19,25 @@ import { onWaveStart } from './items';
 import { duelAutoBoat } from './duel';
 import { awardCampaign } from '../save';
 
-/** 开波:把该波各组展开为按时间排序的出怪事件表(组内 delay 实现「基础先涌、高级随后」) */
+/** 开波:把该波各组展开为按时间排序的出怪事件表(组内 delay 实现「基础先涌、高级随后」);
+ *  水军参战章(第 11 关起):本波有排船则同时派楼船(载员由关卡数据指定,不走无限公式) */
 export function startWave(i: number): void {
   state.waveIdx = i;
-  const groups = LEVELS[state.level - 1].waves[i];
+  const level = LEVELS[state.level - 1];
+  const groups = level.waves[i];
   const ev: SpawnEvent[] = [];
   for (const g of groups) for (let k = 0; k < g.n; k++) ev.push({ t: g.t, at: 0.4 + (g.delay ?? 0) + k * g.gap });
   ev.sort((a, b) => a.at - b.at);
   state.waveEvents = ev;
   state.waveT = 0;
   onWaveStart();   // 被动军械:屯粮车/金钟罩/垦荒令按波结算
+  if (level.navy) {
+    let k = 0;
+    for (const nv of level.navy) if (nv.at === i) { sendBoat(1, 3 + k * 7, k, nv.squad); k++; }
+  }
 }
 
-/** 过关:停留结算页,由玩家选择「下一关」或「返回主菜单」;十关全通直接进通关页。
+/** 过关:停留结算页,由玩家选择「下一关」或「返回主菜单」;全关全通直接进通关页。
  *  同时发军饷(首通全饷、复通四成),结算页展示数额与缘由 */
 export function levelClear(): void {
   const { n, first } = awardCampaign(state.level);

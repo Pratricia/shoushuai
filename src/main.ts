@@ -18,6 +18,7 @@ import { GEAR } from './data/shop';
 import { RANKS, rankAt, rankTitle, advanceRank, winsToPromote, levelCn } from './data/ranks';
 import { AI_PRESETS } from './data/ai';
 import { DUEL, ENDLESS, KEN, ECON, GEAR_BAG } from './config';
+import { LEVELS } from './data/levels';
 import { handleDown, endDrag, cycleSpeed, installInput, shopPointerMove, shopPointerUp } from './input';
 import { drawBoard, drawGridCells, drawGates, drawPalace } from './render/board';
 import { drawShuai, drawBarracks, drawHUD, drawBag } from './render/hud';
@@ -169,5 +170,6 @@ window.__game = {
     addShards, craftFu, fuOf, duelRankState, recordDuelWin, recordDuelLoss },
   ranks: { RANKS, rankAt, rankTitle, advanceRank, winsToPromote, levelCn },
   gear: GEAR,
+  levels: LEVELS,   // 50 关全量审计用(预算/构成/水军排布/Boss 序)
   config: { DUEL, ENDLESS, KEN, ECON, GEAR_BAG },   // 灰盒调参:对战/无限波面压力、军械携行上限现场 A/B
 };

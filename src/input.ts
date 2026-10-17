@@ -25,7 +25,7 @@ import { FUS } from './data/fu';
 import { saveData, ownsGear, inBag, bagActiveCount, passiveCarryCount, carriesGear, unlockGear, equipGear, unequipGear, equipPassive, unequipPassive, craftFu } from './save';
 import { useGear, onGroundOpened } from './systems/items';
 import { duelManualBoat } from './systems/duel';
-import { setShopTab, scrollShop, resetShopScroll, getShopListRect } from './render/overlays';
+import { setShopTab, scrollShop, resetShopScroll, getShopListRect, setLevelPage } from './render/overlays';
 import { toast, addEffect, addFloat } from './systems/combat';
 import { canvas, toLogical } from './canvas';
 
@@ -283,6 +283,7 @@ let shopDown: { x: number; y: number; lastY: number; moved: boolean; scrolling: 
 /** 非对战界面(主菜单/选关/结算/暂停/集市)的按钮派发 */
 function pressButton(b: UIButton): void {
   if (b.id === 'level' && b.n) setupLevel(b.n);
+  else if (b.id === 'lvPage' && b.n !== undefined) setLevelPage(b.n);
   else if (b.id === 'retry') {
     if (state.mode === 'endless') setupEndless();
     else if (state.mode === 'duel') setupDuel();

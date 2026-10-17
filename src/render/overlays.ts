@@ -4,7 +4,7 @@
 import { ctx, rr, setFont } from '../canvas';
 import { W, H, TAU, PAPER, INK, GEAR_BAG } from '../config';
 import { state } from '../state';
-import { LEVELS } from '../data/levels';
+import { LEVELS, CHAPTERS } from '../data/levels';
 import { getMap } from '../data/maps';
 import { saveData, ownsGear, inBag, bagList, bagActiveCount, passiveList, passiveCarryCount, passiveOwnedCount, carriesGear, duelRankState } from '../save';
 import { GEAR, gearOf } from '../data/shop';
@@ -207,6 +207,16 @@ function renderMenu(): void {
 
 /* ---------- 选关 ---------- */
 
+/* 选关分页:每页 10 关(2 行 × 5 列 = 一卷)。50 关平铺必出屏,故按卷翻页;
+   纯界面态(不入存档),每次进选关默认落在最后已通卷的卷首?——否:灰盒全解锁,
+   固定落卷一,翻页自取(保持实现简单) */
+const LV_PAGE = 10;
+let lvPage = 0;
+export function setLevelPage(p: number): void {
+  const pages = Math.ceil(LEVELS.length / LV_PAGE);
+  lvPage = p < 0 ? 0 : p >= pages ? pages - 1 : p;
+}
+
 function renderStart(): void {
   dimLight();
   // 返回主菜单
@@ -233,14 +243,24 @@ function renderStart(): void {
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
-  ctx.fillStyle = '#e3cfa4';
-  setFont(22, false);
-  ctx.fillText('楚河汉界 · 灰盒全解锁', 360, 208);
 
-  // 关卡(灰盒阶段全解锁)
-  for (let n = 1; n <= LEVELS.length; n++) {
-    const row = Math.floor((n - 1) / 5), col = (n - 1) % 5;
-    const x = 136 + col * 112, y = 420 + row * 120;
+  // 卷标(每 10 关一卷;卷名即本章「新东西」预告)
+  const pages = Math.ceil(LEVELS.length / LV_PAGE);
+  const ch = CHAPTERS[lvPage] ?? { name: '卷' + (lvPage + 1), sub: '' };
+  ctx.fillStyle = '#e3cfa4';
+  setFont(28, true);
+  ctx.fillText(ch.name, 360, 236);
+  setFont(19, false);
+  ctx.fillStyle = '#a8946f';
+  ctx.fillText(ch.sub + ' · 灰盒全解锁', 360, 270);
+
+  // 关卡(灰盒阶段全解锁;按卷分页)
+  const from = lvPage * LV_PAGE;
+  const to = Math.min(LEVELS.length, from + LV_PAGE);
+  for (let n = from + 1; n <= to; n++) {
+    const i = n - 1 - from;
+    const row = Math.floor(i / 5), col = i % 5;
+    const x = 136 + col * 112, y = 390 + row * 112;
     rr(x - 48, y - 48, 96, 96, 16);
     ctx.fillStyle = PAPER;
     ctx.fill();
@@ -256,17 +276,32 @@ function renderStart(): void {
     state.uiButtons.push({ id: 'level', n, x: x - 48, y: y - 48, w: 96, h: 96 });
   }
 
+  // 翻页:‹ › + 卷序点
+  ctx.fillStyle = lvPage > 0 ? '#e3cfa4' : 'rgba(227,207,164,0.25)';
+  setFont(44, true);
+  ctx.fillText('‹', 48, 446);
+  if (lvPage > 0) state.uiButtons.push({ id: 'lvPage', n: lvPage - 1, x: 16, y: 398, w: 64, h: 96 });
+  ctx.fillStyle = lvPage < pages - 1 ? '#e3cfa4' : 'rgba(227,207,164,0.25)';
+  ctx.fillText('›', 672, 446);
+  if (lvPage < pages - 1) state.uiButtons.push({ id: 'lvPage', n: lvPage + 1, x: 640, y: 398, w: 64, h: 96 });
+  for (let p = 0; p < pages; p++) {
+    ctx.fillStyle = p === lvPage ? '#e3cfa4' : 'rgba(227,207,164,0.3)';
+    ctx.beginPath();
+    ctx.arc(360 + (p - (pages - 1) / 2) * 30, 630, p === lvPage ? 7 : 5, 0, TAU);
+    ctx.fill();
+  }
+
   // 说明(玩法与规则的大致介绍)
   ctx.fillStyle = '#cdbf9f';
   setFont(22, false);
   ctx.textAlign = 'center';
   const tips = [
-    '· 敌军自城楼沿路进军、直扑帅棋:帅血只有 3 点,守住十关即通关',
+    '· 敌军自城楼沿路进军、直扑帅棋:帅血只有 3 点,守住五十关即通关',
     '· 拖动汉字棋子上阵迎敌;同类同级重叠,即合成更强的棋子',
     '· 粮草只能杀敌赚取;【征兵】补充兵营,「垦荒令」开辟荒地',
     '· 七种棋子各依走法施展攻击,布阵与合成是守帅的关键',
   ];
-  tips.forEach((t, i) => ctx.fillText(t, 360, 700 + i * 40));
+  tips.forEach((t, i) => ctx.fillText(t, 360, 730 + i * 40));
 }
 
 /* ---------- 军资集市 ---------- */
@@ -795,7 +830,7 @@ function renderWin(): void {
   setFont(duelWin ? 60 : 64, true);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(duelWin ? '对垒胜局!' : '十关全通!', 360, duelWin ? 500 : 530);
+  ctx.fillText(duelWin ? '对垒胜局!' : '五十关全通!', 360, duelWin ? 500 : 530);
   ctx.fillStyle = '#8a7a5c';
   setFont(22, false);
   ctx.fillText(duelWin ? '敌军先破帅 · 血战 ' + (state.waveIdx + 1) + ' 波' : '灰盒阶段毕业 · 下一站:对战版', 360, duelWin ? 546 : 595);

@@ -128,7 +128,8 @@ export interface LevelDef {
   mapId: string;
   gold: number;
   gap: number;           // 波与波之间的出兵间隔(秒);0 = 连续出兵不等清场
-  boss?: string;         // 本关「将」位出场的 Boss(bosses.ts 注册表键);选关模式仅 5 的倍数关卡配置
+  boss?: string;         // 本关「将」位出场的 Boss(bosses.ts 注册表键);旧规「仅 5 的倍数关」自第 41 关起打破(群雄逐鹿:场场大考)
+  navy?: { at: number; squad: number }[];  // 水军参战:第 at 波(0 基)开波时派一艘载 squad 人的楼船
   open: [number, number][];  // 初始可布阵格 [c,r](其余封为荒地,垦荒令开辟)
   waves: WaveGroup[][];  // 每波若干组 {兵种, 数量, 出怪间隔}
 }
@@ -286,7 +287,7 @@ export interface SpawnEvent { t: EnemyType; at: number; }
 /** 全局游戏状态(唯一可变状态容器) */
 export interface GameState {
   screen: Screen;
-  mode: GameMode;            // campaign = 十关战役 / endless = 无限模式 / duel = 上下半屏对战
+  mode: GameMode;            // campaign = 五十关战役 / endless = 无限模式 / duel = 上下半屏对战
   side?: DuelSide;           // 对战:本方归属(rival 不享军械被动/不产符片)
   level: number;             // endless 恒为 1(数值锚,强度成长全在波次系数)
   gold: number;

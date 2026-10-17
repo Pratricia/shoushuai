@@ -67,16 +67,16 @@ function buildMarinePath(bx: number, dockX: number): Point[] {
   return [{ x: dockX, y: band.mid }, { x: bx, y: band.mid }];   // 兜底(数据错误时不悬死)
 }
 
-/** 派船(无限模式波次调度):随机一端驶入、随机选桥;
- *  k 为同波船序——错峰入场 + 桥位轮换 + 泊位错道,避免撞船 */
-export function sendBoat(wave: number, stagger = 0, k = 0): void {
+/** 派船(无限模式波次调度;战役水军关亦调此,载员由关卡数据显式覆写):
+ *  随机一端驶入、随机选桥;k 为同波船序——错峰入场 + 桥位轮换 + 泊位错道,避免撞船 */
+export function sendBoat(wave: number, stagger = 0, k = 0, squadOverride?: number): void {
   const bridges = listBridges();
   if (bridges.length === 0) return;
   const band = riverBand();
   const bx = bridges[k % bridges.length];
   const dir = Math.random() < 0.5 ? 1 : -1;
   const dockX = bx - dir * NAVY.dockOffset;
-  const squad = Math.min(NAVY.squadMax, NAVY.squadBase + Math.floor(wave * NAVY.squadPerWave));
+  const squad = Math.min(NAVY.squadMax, squadOverride ?? (NAVY.squadBase + Math.floor(wave * NAVY.squadPerWave)));
   state.boats.push({
     x: dir === 1 ? -90 : W + 90,
     y: band.mid + (k % 2 === 0 ? -8 : 12),   // 双航道错开(相向不叠影)
@@ -92,23 +92,26 @@ export function sendBoat(wave: number, stagger = 0, k = 0): void {
 }
 
 /** 水军下船:强度吃 所属波次 系数 + 敌潮(与同波出怪等价),沿船载路线行军;
- *  精锐散兵与陆上同一条概率轴(抢滩的硬点子) */
+ *  战役水军与陆兵同口径吃「关卡间 +15% 血 / +2% 速」爬坡(无限水军吃波次系数);
+ *  精锐散兵与陆上同一条概率轴(抢滩的硬点子,战役关不产精锐) */
 function spawnMarine(b: Boat): void {
   const def = ENEMIES['水'];
   const w0 = Math.max(0, b.wave - 1);
   const tide = 1 + TIDE.hpPerSec * state.levelT;
-  const hpMul = tide * waveMul(w0);
+  const camp = state.mode === 'campaign';
+  const hpMul = tide * (camp ? 1 + 0.15 * (state.level - 1) : waveMul(w0));
+  const spdMul = (camp ? 1 + 0.02 * (state.level - 1) : waveSpdMul(w0)) * (1 + TIDE.spdPerSec * state.levelT);
   const vt = rollVet(w0, false);
   state.enemies.push({
     type: '水',
     x: b.x + b.dir * 26, y: b.y + 4,
     hp: def.hp * hpMul * vt.hp, maxHp: def.hp * hpMul * vt.hp,
-    spd: def.spd * waveSpdMul(w0) * (1 + TIDE.spdPerSec * state.levelT) * vt.spd,
+    spd: def.spd * spdMul * vt.spd,
     slowT: 0, kbT: 0, armorBreakT: 0, walkPh: Math.random() * Math.PI * 2,
     pauseT: 0, dead: false,
     aimT: 0, aimX: 0, aimY: 0, shotDone: false, tide,
     r: def.r + (vt.vet ? 2 : 0),
-    gold: (def.gold + Math.floor(w0 / ENDLESS.goldPer6)) * vt.gold,
+    gold: (camp ? def.gold : def.gold + Math.floor(w0 / ENDLESS.goldPer6)) * vt.gold,
     dmg: def.dmg, boss: null, vet: vt.vet,
     path: b.path, wpi: 1,
   });
