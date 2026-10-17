@@ -5,8 +5,8 @@
    无限模式:波次构成由 endlessWaveInfo(n) 程序生成——世代
    递进(马 3 起 / 车 6 起 / 象 9 起 / 砲 11 起)、数量与密度
    随波数爬坡;每 5 波一场 Boss(注册表轮换、按出场序强化);
-   每 3 波(自第 4 波)水军楼船自河上来袭。永不结算,血战至
-   帅陨落。
+   每 3 波(自第 4 波)水军楼船自河上来袭;第 16 波起「精兵化」
+   (杂卒折算成精锐,见 applyElite)。永不结算,血战至帅陨落。
    ============================================================ */
 import type { SpawnEvent, WaveGroup, BossDef } from '../types';
 import { state } from '../state';
@@ -74,6 +74,34 @@ const w = (t: WaveGroup['t'], n: number, gap: number, delay = 0): WaveGroup => (
 /** 数量折算:向上限收敛 + 可按 scale 打折(对战单人单路时 scale < 1) */
 const cap = (v: number, m: number, scale = 1): number => Math.min(Math.max(0, Math.round(v * scale)), m);
 
+/** 后期「精兵化」(仅无限模式;对战波压由 DUEL 的 hpMul/lateMul 承担,不掺这份):
+ *  第 eliteFrom 波起,每波把更多杂卒折算成精锐(象/车/砲/马 按 40/25/20/15 分账、象吃尾差)。
+ *  出怪总数不涨——不给玩家多送击杀粮;血质与拆阵威胁随波上行:后期加压靠「质」不靠「量」。
+ *  在 groups 组好之后统一折算,HUD 预览与实发自然同一份 */
+function applyElite(g: WaveGroup[], n: number): void {
+  if (state.mode !== 'endless' || n < ENDLESS.eliteFrom) return;
+  const zu = g.find(gr => gr.t === '卒');
+  if (!zu) return;
+  const conv = Math.min(
+    Math.round((n - ENDLESS.eliteFrom + 1) * ENDLESS.elitePerWave),
+    Math.floor(zu.n * ENDLESS.eliteMaxShare),
+  );
+  if (conv <= 0) return;
+  zu.n -= conv;
+  const add: [WaveGroup['t'], number][] = [
+    ['象', conv - Math.floor(conv * 0.25) - Math.floor(conv * 0.2) - Math.floor(conv * 0.15)],
+    ['车', Math.floor(conv * 0.25)],
+    ['砲', Math.floor(conv * 0.2)],
+    ['马', Math.floor(conv * 0.15)],
+  ];
+  for (const [t, k] of add) {
+    if (k <= 0) continue;
+    const gr = g.find(x => x.t === t);
+    if (gr) gr.n += k;
+    else g.push(w(t, k, 2.4, 4));   // 兜底(eliteFrom 晚于各兵种解锁波,正常走不到)
+  }
+}
+
 /** 无限波次构成(纯数据生成;HUD 预览与开波共用同一份)。
  *  scale 供对战模式折算单路出怪量(默认 1 = 无限模式原样) */
 export function endlessWaveInfo(n: number, scale = 1): EndlessWaveInfo {
@@ -99,6 +127,7 @@ export function endlessWaveInfo(n: number, scale = 1): EndlessWaveInfo {
   if (n >= 6) g.push(w('车', cap(1 + n * 0.35, 10, scale), Math.max(1.6, 3.4 - n * 0.08), 5));
   if (n >= 9) g.push(w('象', cap(1 + n * 0.25, 8, scale), 4.6, 6));
   if (n >= 11) g.push(w('砲', cap(1 + n * 0.22, 7, scale), 5.0, 7));
+  applyElite(g, n);
   return { groups: g, navy, boss };
 }
 

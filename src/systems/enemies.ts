@@ -36,16 +36,25 @@ export function waveSpdMul(w0: number): number {
   return 1 + Math.min(ENDLESS.spdCap, ENDLESS.spdPerWave * w0);
 }
 
+/** 无限模式 Boss 的波次血量爬坡(只吃半份,share 见 ENDLESS.bossRampShare):
+ *  常规兵吃 waveMul 二次爬坡,若 Boss 只靠 endlessBoss 的线性克隆(+55%/出场),
+ *  30 波后大考反被常规波稀释成小菜 → 让 Boss 吃半份爬坡,与对战 lateMul 用意一致。
+ *  战役 / 对战不动(战役 Boss 手调数值;对战 Boss 已吃 lateMul) */
+function bossWaveRamp(w0: number): number {
+  if (state.mode !== 'endless') return 1;
+  return 1 + (waveMul(w0) - 1) * ENDLESS.bossRampShare;
+}
+
 /** 一兵出场时的数值(所有出怪路径共用一处,保证同波伏兵不会比正常出的兵更脆/更快)。
  *  血/速 = 关卡层数(血+15%/关、速+2%/关)× 敌潮(随关内时间)× 波次爬坡;
- *  - boss   :不吃敌潮、不吃波次提速——无限模式 Boss 强化全由 endlessBoss 克隆定义承担;
- *             只有「战事升级」段(第 7 波起)是通用加压,Boss 一并跟上(lateMul),免得末段大考反成小菜
+ *  - boss   :不吃敌潮、不吃波次提速——无限模式 Boss 强化 = endlessBoss 克隆(出场序递增)
+ *             × bossWaveRamp(半份波次爬坡);对战 Boss 另吃 lateMul,免得末段大考反成小菜
  *  - spdTide:是否吃「敌潮提速」。常规出怪吃;Boss 与 Boss 埋伏的伏兵都不吃(沿用原有口径,勿顺手统一)
  */
 function spawnStats(def: { hp: number; spd: number }, w0: number, boss: boolean, spdTide: boolean): { hp: number; maxHp: number; spd: number; tide: number } {
   const tide = boss ? 1 : 1 + TIDE.hpPerSec * state.levelT;        // Boss 不吃敌潮(数值手调)
   const tideSpd = (boss || !spdTide) ? 1 : 1 + TIDE.spdPerSec * state.levelT;
-  const hpMul = (1 + 0.15 * (state.level - 1)) * tide * (boss ? lateMul(w0) : waveMul(w0));
+  const hpMul = (1 + 0.15 * (state.level - 1)) * tide * (boss ? lateMul(w0) * bossWaveRamp(w0) : waveMul(w0));
   const spdMul = (1 + 0.02 * (state.level - 1)) * tideSpd * (boss ? 1 : waveSpdMul(w0));
   return { hp: def.hp * hpMul, maxHp: def.hp * hpMul, spd: def.spd * spdMul, tide };
 }
