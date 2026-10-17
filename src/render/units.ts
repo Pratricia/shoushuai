@@ -1,7 +1,7 @@
 /* ============================================================
    渲染 · 单位:棋子、敌军、弹道、特效、飘字、提示条、拖拽预览
    ============================================================ */
-import type { Piece, TileType, Point, Enemy, Boat } from '../types';
+import type { Piece, TileType, Point, Enemy, Boat, Effect } from '../types';
 import { ctx, rr, setFont } from '../canvas';
 import { TAU, W, MAXLV, PIECES, TIER, SHELL, TIDE, NAVY, MERGE, xpNeed } from '../config';
 import { state, cellCenter, cellAt, slotCenter } from '../state';
@@ -1150,245 +1150,261 @@ export function drawShells(): void {
 
 /* ---------- 特效 ---------- */
 
+/** 特效逐帧绘制(每种一段,实现见下方 fx*;派发顺序与原 if 链一致) */
 export function drawEffects(): void {
   for (const f of state.effects) {
     const k = f.t / f.dur;
-    if (f.type === 'stab') {
-      // 兵:白色刺击锥 + 侧翼红线(快速探出后消散)
-      const dx = f.x2 - f.x, dy = f.y2 - f.y;
-      const dd = Math.hypot(dx, dy) || 1;
-      const ux = dx / dd, uy = dy / dd;
-      const ext = dd * (0.25 + 0.5 * Math.min(1, k * 2));
-      ctx.globalAlpha = 1 - k;
-      ctx.strokeStyle = '#fff8e7';
-      ctx.lineWidth = 5 * (1 - k) + 1;
-      ctx.beginPath();
-      ctx.moveTo(f.x + ux * 10, f.y + uy * 10);
-      ctx.lineTo(f.x + ux * ext, f.y + uy * ext);
-      ctx.stroke();
-      ctx.strokeStyle = '#c0392b';
-      ctx.lineWidth = 2.5 * (1 - k) + 0.5;
-      ctx.beginPath();
-      ctx.moveTo(f.x + ux * 10 - uy * 6, f.y + uy * 10 + ux * 6);
-      ctx.lineTo(f.x + ux * ext - uy * 6, f.y + uy * ext + ux * 6);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'jump') {
-      // 马:弹射虚线弧
-      ctx.globalAlpha = (1 - k) * 0.85;
-      ctx.strokeStyle = '#ef6c00';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([5, 6]);
-      ctx.beginPath();
-      ctx.moveTo(f.x, f.y);
-      ctx.quadraticCurveTo((f.x + f.x2) / 2, (f.y + f.y2) / 2 - 40, f.x2, f.y2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'stomp') {
-      // 相:重踏——土色冲击双环 + 沿环扬尘
-      ctx.globalAlpha = (1 - k) * 0.75;
-      ctx.strokeStyle = '#a1887f';
-      ctx.lineWidth = 7 * (1 - k * 0.5);
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.3 + 0.75 * k), 0, TAU);
-      ctx.stroke();
-      ctx.strokeStyle = '#8d6e63';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.55 + 0.5 * k), 0, TAU);
-      ctx.stroke();
-      ctx.fillStyle = '#bcaaa4';
-      for (let i = 0; i < 7; i++) {
-        const a = i * TAU / 7 + 0.4;
-        const rr = f.r * (0.5 + 0.5 * k);
-        ctx.globalAlpha = (1 - k) * 0.4;
-        ctx.beginPath();
-        ctx.arc(f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr - 7 * k, 3 + 3 * (1 - k), 0, TAU);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'slash') {
-      // 仕:斜十字斩痕(金)
-      ctx.globalAlpha = 1 - k;
-      ctx.strokeStyle = '#b8860b';
-      ctx.lineWidth = 5 * (1 - k * 0.5);
-      ctx.beginPath();
-      ctx.moveTo(f.x - f.r * 0.7, f.y - f.r * 0.7);
-      ctx.lineTo(f.x + f.r * 0.7, f.y + f.r * 0.7);
-      ctx.moveTo(f.x + f.r * 0.7, f.y - f.r * 0.7);
-      ctx.lineTo(f.x - f.r * 0.7, f.y + f.r * 0.7);
-      ctx.stroke();
-      ctx.globalAlpha = (1 - k) * 0.45;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.55 + 0.45 * k), 0, TAU);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'muzzle') {
-      // 炮:炮口火光——亮核 + 放射芒线
-      const kk = 1 - k;
-      const g = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, f.r * (1 + k));
-      g.addColorStop(0, 'rgba(255,246,220,' + kk.toFixed(3) + ')');
-      g.addColorStop(0.6, 'rgba(255,152,0,' + (kk * 0.8).toFixed(3) + ')');
-      g.addColorStop(1, 'rgba(255,152,0,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (1 + k), 0, TAU);
-      ctx.fill();
-      ctx.globalAlpha = kk;
-      ctx.strokeStyle = '#ffe082';
-      ctx.lineWidth = 2.5;
-      for (let i = 0; i < 6; i++) {
-        const a = i * TAU / 6 + 0.35;
-        const l = f.r * (0.9 + 0.7 * kk);
-        ctx.beginPath();
-        ctx.moveTo(f.x + Math.cos(a) * f.r * 0.4, f.y + Math.sin(a) * f.r * 0.4);
-        ctx.lineTo(f.x + Math.cos(a) * (f.r * 0.4 + l), f.y + Math.sin(a) * (f.r * 0.4 + l));
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'smoke') {
-      // 炮:尾烟——灰团膨胀上飘消散
-      ctx.globalAlpha = (1 - k) * 0.3;
-      ctx.fillStyle = '#7a6a52';
-      ctx.beginPath();
-      ctx.arc(f.x, f.y - 12 * k, f.r * (0.6 + 0.8 * k), 0, TAU);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'boom') {
-      // 炮:落地爆炸——冲击双环 + 核心火光 + 火花放射 + 地面焦痕
-      ctx.globalAlpha = 1 - k;
-      ctx.strokeStyle = '#f3e2b8';
-      ctx.lineWidth = 6 * (1 - k) + 1;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.2 + 0.8 * k), 0, TAU);
-      ctx.stroke();
-      ctx.globalAlpha = (1 - k) * 0.5;
-      ctx.lineWidth = 3 * (1 - k) + 1;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.1 + 0.55 * k), 0, TAU);
-      ctx.stroke();
-      if (k < 0.45) {
-        const kk = k / 0.45;
-        const g = ctx.createRadialGradient(f.x, f.y, 2, f.x, f.y, f.r * 0.6);
-        g.addColorStop(0, 'rgba(255,250,235,' + (1 - kk).toFixed(3) + ')');
-        g.addColorStop(0.4, 'rgba(255,152,0,' + ((1 - kk) * 0.75).toFixed(3) + ')');
-        g.addColorStop(1, 'rgba(255,87,34,0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(f.x, f.y, f.r * 0.6, 0, TAU);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1 - k;
-      ctx.strokeStyle = '#ffd54f';
-      ctx.lineWidth = 2.5;
-      for (let i = 0; i < 9; i++) {
-        const a = i * TAU / 9 + 0.2;
-        const r1 = f.r * (0.15 + 0.35 * k), r2 = f.r * (0.3 + 0.55 * k);
-        ctx.beginPath();
-        ctx.moveTo(f.x + Math.cos(a) * r1, f.y + Math.sin(a) * r1);
-        ctx.lineTo(f.x + Math.cos(a) * r2, f.y + Math.sin(a) * r2);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = (1 - k) * 0.4;
-      ctx.fillStyle = '#3a2f1f';
-      ctx.beginPath();
-      ctx.ellipse(f.x, f.y, f.r * 0.42, f.r * 0.2, 0, 0, TAU);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'hit') {
-      // 命中:星芒闪(白芒 + 中心亮核)
-      ctx.globalAlpha = 1 - k;
-      ctx.strokeStyle = '#f6e8c8';
-      ctx.lineWidth = 3 * (1 - k) + 0.5;
-      for (let i = 0; i < 6; i++) {
-        const a = i * TAU / 6 + 0.5;
-        const r1 = f.r * (0.2 + 0.2 * k), r2 = f.r * (0.55 + 0.75 * k);
-        ctx.beginPath();
-        ctx.moveTo(f.x + Math.cos(a) * r1, f.y + Math.sin(a) * r1);
-        ctx.lineTo(f.x + Math.cos(a) * r2, f.y + Math.sin(a) * r2);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = (1 - k) * 0.8;
-      ctx.fillStyle = '#fffdf4';
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * 0.25 * (1 - k * 0.5), 0, TAU);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'ripple') {
-      // 水军:水面涟漪——双环浅青渐散
-      ctx.globalAlpha = (1 - k) * 0.5;
-      ctx.strokeStyle = '#7ec8e3';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.3 + 0.8 * k), 0, TAU);
-      ctx.stroke();
-      ctx.globalAlpha = (1 - k) * 0.28;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.15 + 0.5 * k), 0, TAU);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (f.type === 'merge') {
-      // 合体:金环轻扬——细双环自盘心扩出 + 五点金星,纯描边、半径不出本格,快速渐散
-      ctx.globalAlpha = (1 - k) * 0.9;
-      ctx.strokeStyle = '#ffd54f';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.25 + 0.75 * k), 0, TAU);
-      ctx.stroke();
-      ctx.globalAlpha = (1 - k) * 0.45;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.12 + 0.55 * k), 0, TAU);
-      ctx.stroke();
-      ctx.globalAlpha = 1 - k;
-      ctx.fillStyle = '#ffe082';
-      for (let i = 0; i < 5; i++) {
-        const a = i * TAU / 5 + 0.6;
-        const rr = f.r * (0.55 + 0.45 * k);
-        ctx.beginPath();
-        ctx.arc(f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr, 2.5 * (1 - k) + 0.5, 0, TAU);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    ctx.globalAlpha = (1 - k) * 0.5;
-    if (f.type === 'palace') {
-      // 帅被砍:红色冲击环
-      ctx.strokeStyle = '#c0392b';
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, 20 + 90 * k, 0, TAU);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = f.type === 'death' ? '#3a322a' : '#2f2820';
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (0.4 + 0.9 * k), 0, TAU);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
+    if (f.type === 'stab') fxStab(f, k);
+    else if (f.type === 'jump') fxJump(f, k);
+    else if (f.type === 'stomp') fxStomp(f, k);
+    else if (f.type === 'slash') fxSlash(f, k);
+    else if (f.type === 'muzzle') fxMuzzle(f, k);
+    else if (f.type === 'smoke') fxSmoke(f, k);
+    else if (f.type === 'boom') fxBoom(f, k);
+    else if (f.type === 'hit') fxHit(f, k);
+    else if (f.type === 'ripple') fxRipple(f, k);
+    else if (f.type === 'merge') fxMerge(f, k);
+    else fxPuff(f, k);
   }
+}
+
+/** 兵:白色刺击锥 + 侧翼红线(快速探出后消散) */
+function fxStab(f: Effect, k: number): void {
+  const dx = f.x2 - f.x, dy = f.y2 - f.y;
+  const dd = Math.hypot(dx, dy) || 1;
+  const ux = dx / dd, uy = dy / dd;
+  const ext = dd * (0.25 + 0.5 * Math.min(1, k * 2));
+  ctx.globalAlpha = 1 - k;
+  ctx.strokeStyle = '#fff8e7';
+  ctx.lineWidth = 5 * (1 - k) + 1;
+  ctx.beginPath();
+  ctx.moveTo(f.x + ux * 10, f.y + uy * 10);
+  ctx.lineTo(f.x + ux * ext, f.y + uy * ext);
+  ctx.stroke();
+  ctx.strokeStyle = '#c0392b';
+  ctx.lineWidth = 2.5 * (1 - k) + 0.5;
+  ctx.beginPath();
+  ctx.moveTo(f.x + ux * 10 - uy * 6, f.y + uy * 10 + ux * 6);
+  ctx.lineTo(f.x + ux * ext - uy * 6, f.y + uy * ext + ux * 6);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/** 马:弹射虚线弧 */
+function fxJump(f: Effect, k: number): void {
+  ctx.globalAlpha = (1 - k) * 0.85;
+  ctx.strokeStyle = '#ef6c00';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([5, 6]);
+  ctx.beginPath();
+  ctx.moveTo(f.x, f.y);
+  ctx.quadraticCurveTo((f.x + f.x2) / 2, (f.y + f.y2) / 2 - 40, f.x2, f.y2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+}
+
+/** 相:重踏——土色冲击双环 + 沿环扬尘 */
+function fxStomp(f: Effect, k: number): void {
+  ctx.globalAlpha = (1 - k) * 0.75;
+  ctx.strokeStyle = '#a1887f';
+  ctx.lineWidth = 7 * (1 - k * 0.5);
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.3 + 0.75 * k), 0, TAU);
+  ctx.stroke();
+  ctx.strokeStyle = '#8d6e63';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.55 + 0.5 * k), 0, TAU);
+  ctx.stroke();
+  ctx.fillStyle = '#bcaaa4';
+  for (let i = 0; i < 7; i++) {
+    const a = i * TAU / 7 + 0.4;
+    const rr = f.r * (0.5 + 0.5 * k);
+    ctx.globalAlpha = (1 - k) * 0.4;
+    ctx.beginPath();
+    ctx.arc(f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr - 7 * k, 3 + 3 * (1 - k), 0, TAU);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** 仕:斜十字斩痕(金) */
+function fxSlash(f: Effect, k: number): void {
+  ctx.globalAlpha = 1 - k;
+  ctx.strokeStyle = '#b8860b';
+  ctx.lineWidth = 5 * (1 - k * 0.5);
+  ctx.beginPath();
+  ctx.moveTo(f.x - f.r * 0.7, f.y - f.r * 0.7);
+  ctx.lineTo(f.x + f.r * 0.7, f.y + f.r * 0.7);
+  ctx.moveTo(f.x + f.r * 0.7, f.y - f.r * 0.7);
+  ctx.lineTo(f.x - f.r * 0.7, f.y + f.r * 0.7);
+  ctx.stroke();
+  ctx.globalAlpha = (1 - k) * 0.45;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.55 + 0.45 * k), 0, TAU);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/** 炮:炮口火光——亮核 + 放射芒线 */
+function fxMuzzle(f: Effect, k: number): void {
+  const kk = 1 - k;
+  const g = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, f.r * (1 + k));
+  g.addColorStop(0, 'rgba(255,246,220,' + kk.toFixed(3) + ')');
+  g.addColorStop(0.6, 'rgba(255,152,0,' + (kk * 0.8).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(255,152,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (1 + k), 0, TAU);
+  ctx.fill();
+  ctx.globalAlpha = kk;
+  ctx.strokeStyle = '#ffe082';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 6; i++) {
+    const a = i * TAU / 6 + 0.35;
+    const l = f.r * (0.9 + 0.7 * kk);
+    ctx.beginPath();
+    ctx.moveTo(f.x + Math.cos(a) * f.r * 0.4, f.y + Math.sin(a) * f.r * 0.4);
+    ctx.lineTo(f.x + Math.cos(a) * (f.r * 0.4 + l), f.y + Math.sin(a) * (f.r * 0.4 + l));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** 炮:尾烟——灰团膨胀上飘消散 */
+function fxSmoke(f: Effect, k: number): void {
+  ctx.globalAlpha = (1 - k) * 0.3;
+  ctx.fillStyle = '#7a6a52';
+  ctx.beginPath();
+  ctx.arc(f.x, f.y - 12 * k, f.r * (0.6 + 0.8 * k), 0, TAU);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+/** 炮:落地爆炸——冲击双环 + 核心火光 + 火花放射 + 地面焦痕 */
+function fxBoom(f: Effect, k: number): void {
+  ctx.globalAlpha = 1 - k;
+  ctx.strokeStyle = '#f3e2b8';
+  ctx.lineWidth = 6 * (1 - k) + 1;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.2 + 0.8 * k), 0, TAU);
+  ctx.stroke();
+  ctx.globalAlpha = (1 - k) * 0.5;
+  ctx.lineWidth = 3 * (1 - k) + 1;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.1 + 0.55 * k), 0, TAU);
+  ctx.stroke();
+  if (k < 0.45) {
+    const kk = k / 0.45;
+    const g = ctx.createRadialGradient(f.x, f.y, 2, f.x, f.y, f.r * 0.6);
+    g.addColorStop(0, 'rgba(255,250,235,' + (1 - kk).toFixed(3) + ')');
+    g.addColorStop(0.4, 'rgba(255,152,0,' + ((1 - kk) * 0.75).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,87,34,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r * 0.6, 0, TAU);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1 - k;
+  ctx.strokeStyle = '#ffd54f';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 9; i++) {
+    const a = i * TAU / 9 + 0.2;
+    const r1 = f.r * (0.15 + 0.35 * k), r2 = f.r * (0.3 + 0.55 * k);
+    ctx.beginPath();
+    ctx.moveTo(f.x + Math.cos(a) * r1, f.y + Math.sin(a) * r1);
+    ctx.lineTo(f.x + Math.cos(a) * r2, f.y + Math.sin(a) * r2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = (1 - k) * 0.4;
+  ctx.fillStyle = '#3a2f1f';
+  ctx.beginPath();
+  ctx.ellipse(f.x, f.y, f.r * 0.42, f.r * 0.2, 0, 0, TAU);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+/** 命中:星芒闪(白芒 + 中心亮核) */
+function fxHit(f: Effect, k: number): void {
+  ctx.globalAlpha = 1 - k;
+  ctx.strokeStyle = '#f6e8c8';
+  ctx.lineWidth = 3 * (1 - k) + 0.5;
+  for (let i = 0; i < 6; i++) {
+    const a = i * TAU / 6 + 0.5;
+    const r1 = f.r * (0.2 + 0.2 * k), r2 = f.r * (0.55 + 0.75 * k);
+    ctx.beginPath();
+    ctx.moveTo(f.x + Math.cos(a) * r1, f.y + Math.sin(a) * r1);
+    ctx.lineTo(f.x + Math.cos(a) * r2, f.y + Math.sin(a) * r2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = (1 - k) * 0.8;
+  ctx.fillStyle = '#fffdf4';
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * 0.25 * (1 - k * 0.5), 0, TAU);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+/** 水军:水面涟漪——双环浅青渐散 */
+function fxRipple(f: Effect, k: number): void {
+  ctx.globalAlpha = (1 - k) * 0.5;
+  ctx.strokeStyle = '#7ec8e3';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.3 + 0.8 * k), 0, TAU);
+  ctx.stroke();
+  ctx.globalAlpha = (1 - k) * 0.28;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.15 + 0.5 * k), 0, TAU);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/** 合体:金环轻扬——细双环自盘心扩出 + 五点金星,纯描边、半径不出本格,快速渐散 */
+function fxMerge(f: Effect, k: number): void {
+  ctx.globalAlpha = (1 - k) * 0.9;
+  ctx.strokeStyle = '#ffd54f';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.25 + 0.75 * k), 0, TAU);
+  ctx.stroke();
+  ctx.globalAlpha = (1 - k) * 0.45;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r * (0.12 + 0.55 * k), 0, TAU);
+  ctx.stroke();
+  ctx.globalAlpha = 1 - k;
+  ctx.fillStyle = '#ffe082';
+  for (let i = 0; i < 5; i++) {
+    const a = i * TAU / 5 + 0.6;
+    const rr = f.r * (0.55 + 0.45 * k);
+    ctx.beginPath();
+    ctx.arc(f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr, 2.5 * (1 - k) + 0.5, 0, TAU);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** 兜底:帅被砍的朱红冲击环(按剩余时间扩环);其余类型(阵亡的暗色土团等)一团渐散 */
+function fxPuff(f: Effect, k: number): void {
+  ctx.globalAlpha = (1 - k) * 0.5;
+  if (f.type === 'palace') {
+    // 帅被砍:红色冲击环
+    ctx.strokeStyle = '#c0392b';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 20 + 90 * k, 0, TAU);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = f.type === 'death' ? '#3a322a' : '#2f2820';
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r * (0.4 + 0.9 * k), 0, TAU);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 /* ---------- 飘字 / 提示条 ---------- */
