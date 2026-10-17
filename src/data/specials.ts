@@ -25,7 +25,9 @@
    ============================================================ */
 import type { PieceType, TileType } from '../types';
 
-/** 特殊军定义:倍率作用于基础兵种(与等级成长叠乘) */
+/** 特殊军定义:倍率作用于基础兵种(与等级成长叠乘);
+ *  mech = 独门机制键(数值在 config.SP_MECH)——特殊军不能只是「数值大的基础兵」,
+ *  每军一个一眼可见的独门打法(羊角士的机制是「殉国破围」,挂在 enemies.ts 挡驾处) */
 export interface SpecialDef {
   id: string; name: string;
   base: PieceType;          // 成军的基础棋子(字牌须贴着它)
@@ -36,41 +38,42 @@ export interface SpecialDef {
   area?: number;            // 范围类倍率(溅射半径 / 跳跃距离 / 冲程 / 践踏圈)
   hops?: number;            // 马:连跳总跳数(覆盖基础值)
   hitCap?: number;          // 车:碾压命中上限(覆盖基础值)
+  mech?: string;            // 独门机制键(见 config.SP_MECH)
   desc: string;             // 一句话风味(结算/图鉴用)
 }
 
 export const SPECIALS: Record<string, SpecialDef> = {
-  /* 连环马:两马互保,连环五踏——踏得更多、更远 */
+  /* 连环马:两马互保,连环五踏——每踏落点震荡余波,一踏一片 */
   '连环马': {
     id: '连环马', name: '连环马', base: '马', parts: ['连', '环'],
-    dmg: 2.0, area: 1.25, hops: 5, desc: '两马互保 · 连环五踏',
+    dmg: 2.0, area: 1.25, hops: 5, mech: 'ringHop', desc: '两马互保 · 踏落震荡余波',
   },
-  /* 担竿炮:双炮担竿同线而列,射程更远、落点重轰大圈 */
+  /* 担竿炮:双炮担竿同线而列,重轰大圈——落点敌人被重锤砸停 */
   '担竿炮': {
     id: '担竿炮', name: '担竿炮', base: '炮', parts: ['担', '竿'],
-    dmg: 1.9, range: 1.2, area: 1.55, desc: '双炮担竿 · 重轰大圈',
+    dmg: 1.9, range: 1.2, area: 1.55, mech: 'stunShell', desc: '双炮担竿 · 重轰震停',
   },
-  /* 巡河炮:炮巡楚河,隔河长射、重轰 */
+  /* 巡河炮:炮巡楚河,隔河长射——一炮双落,主弹之外再补次远目标 */
   '巡河炮': {
     id: '巡河炮', name: '巡河炮', base: '炮', parts: ['巡', '河'],
-    dmg: 1.8, range: 1.25, area: 1.45, desc: '炮巡楚河 · 隔河长射',
+    dmg: 1.8, range: 1.25, area: 1.45, mech: 'twinShell', desc: '炮巡楚河 · 一炮双落',
   },
-  /* 骑河车:车骑河沿要道,横扫两岸、碾压更多 */
+  /* 骑河车:车骑河沿要道——冲阵全速不吃碾压减速,撞飞更狠,横扫两岸 */
   '骑河车': {
     id: '骑河车', name: '骑河车', base: '车', parts: ['骑', '河'],
-    dmg: 1.9, area: 1.35, hitCap: 7, desc: '车骑河沿 · 横扫两岸',
+    dmg: 1.9, area: 1.35, hitCap: 7, mech: 'fullSteam', desc: '全速冲阵 · 撞飞两岸',
   },
-  /* 过河兵:过河卒强于车,突刺更快更狠 */
+  /* 过河兵:过河卒强于车——突刺贯穿,一刺连带身后之敌 */
   '过河兵': {
     id: '过河兵', name: '过河兵', base: '兵', parts: ['过', '河'],
-    dmg: 2.5, haste: 1.3, range: 1.25, desc: '过河卒 · 强于车',
+    dmg: 2.5, haste: 1.3, range: 1.25, mech: 'pierce', desc: '突刺贯穿 · 一刺两敌',
   },
-  /* 飞相局:飞相局起手,相飞田字——一落千钧,踏圈更阔 */
+  /* 飞相局:相飞田字,一落千钧——落点中心双倍碎击,全圈强推散 */
   '飞相局': {
     id: '飞相局', name: '飞相局', base: '相', parts: ['飞', '局'],
-    dmg: 1.9, range: 1.2, area: 1.5, desc: '相飞田字 · 一落千钧',
+    dmg: 1.9, range: 1.2, area: 1.5, mech: 'crushLand', desc: '落地千钧 · 中心碎击',
   },
-  /* 羊角士:双士上角如羊角拱宫——宫斩更利 */
+  /* 羊角士:双士上角如羊角拱宫——殉国挡驾时破围一击(机制在 enemies.ts) */
   '羊角士': {
     id: '羊角士', name: '羊角士', base: '仕', parts: ['羊', '角'],
     dmg: 2.2, range: 1.3, desc: '双角拱宫 · 殉国破围',

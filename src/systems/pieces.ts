@@ -10,7 +10,7 @@
    ============================================================ */
 import type { Piece, PieceDef, PieceType, Enemy, JumpState, ChargeState } from '../types';
 import { state, cellCenter, boardFu } from '../state';
-import { PIECES, GROWTH, W, FU_MECH } from '../config';
+import { PIECES, GROWTH, W, FU_MECH, SP_MECH } from '../config';
 import { dist, clamp, maxBy, rand, shellArcH } from './geometry';
 import { damageEnemy, knockback, addEffect, shellHit, addZone } from './combat';
 import { airborne } from './skills';
@@ -23,6 +23,11 @@ export interface PieceStats { dmg: number; cd: number; range: number; area: numb
 /** 本棋盘已铸兵符的机制(未铸 = undefined)——特殊军继承基础兵种的机制 */
 function fuMech(p: Piece): FuMech | undefined {
   return boardFu(p.type)?.mech;
+}
+
+/** 特殊军的独门机制键(未挂牌 = undefined;数值在 config.SP_MECH) */
+function spMech(p: Piece): string | undefined {
+  return p.tag ? SPECIALS[p.tag]?.mech : undefined;
 }
 
 /** 生效定义:基础兵种定义 × 特殊军覆盖项(连环马多跳/担竿炮重轰)
@@ -89,16 +94,20 @@ function stompLand(p: Piece): void {
   const s = pieceStats(p);
   const pos = cellCenter(p.c, p.r);
   const R = (def.stompR ?? 135) * s.area;
+  const crush = spMech(p) === 'crushLand';   // 独门·飞相局「千钧」
   for (const e of state.enemies) {
     if (e.dead || airborne(e)) continue;      // 卧槽马腾空中:落不着
     const dd = dist(pos.x, pos.y, e.x, e.y);
     if (dd <= R) {
-      damageEnemy(e, s.dmg, stompSlow(p), p);
+      // 落点中心碎击双倍伤害,全圈推散更狠(一落千钧,近者粉碎、远者掀翻)
+      const inner = crush && dd <= R * SP_MECH.crushLand.inner;
+      damageEnemy(e, inner ? s.dmg * SP_MECH.crushLand.dmg : s.dmg, stompSlow(p), p);
       const ux = dd ? (e.x - pos.x) / dd : 0;
-      knockback(e, ux * (def.kb ?? 40), -16);
+      knockback(e, ux * (def.kb ?? 40) * (crush ? SP_MECH.crushLand.kb : 1), -16);
     }
   }
   addEffect(pos.x, pos.y, 'stomp', R);
+  if (crush) addEffect(pos.x, pos.y, 'stomp', R * SP_MECH.crushLand.inner);   // 内圈可见「碎击区」
   addEffect(pos.x, pos.y + 20, 'dust', 26);
   // 兵符·相羽符:落点留下一片减速沼泽(困住再烤/补斩)
   if (fuMech(p) === 'slowStomp') addZone('slow', pos.x, pos.y, FU_MECH.slowStomp.radius, FU_MECH.slowStomp.dur);
@@ -135,7 +144,9 @@ export function updatePieces(dt: number): void {
       const ch: ChargeState = p.charge;
       if (ch.phase === 'out') {
         // 冲出速度 = 基速 × drag^已命中数(碾压人马越多家,冲得越滞重)
-        const v = 900 * Math.pow(def.drag ?? 0.82, ch.hit.length);
+        // 独门·骑河车「全速」:碾压不拖速,一路全速碾穿(横扫两岸)
+        const steam = spMech(p) === 'fullSteam';
+        const v = 900 * (steam ? 1 : Math.pow(def.drag ?? 0.82, ch.hit.length));
         ch.dist = Math.min(ch.len, ch.dist + v * dt);
         const k = clamp(ch.dist / ch.len, 0, 1);
         ch.x = ch.fx + (ch.tx - ch.fx) * k;
@@ -150,11 +161,12 @@ export function updatePieces(dt: number): void {
             damageEnemy(e, s.dmg, 0, p);
             // 兵符·车辕符:撞中即晕(原地不能行军,给集火时间)
             if (fuMech(p) === 'stunCharge') e.pauseT = Math.max(e.pauseT, FU_MECH.stunCharge.dur);
-            // 被撞飞:向路径侧方甩出 + 沿途被顶回
+            // 被撞飞:向路径侧方甩出 + 沿途被顶回(骑河车全速:撞飞更狠)
+            const kbm = steam ? SP_MECH.fullSteam.kb : 1;
             const cross = nx * (e.y - ch.y) - ny * (e.x - ch.x);
             const sgn = cross >= 0 ? 1 : -1;
-            knockback(e, -ny * sgn * (def.kb ?? 55) - nx * (def.kb ?? 55) * 0.45,
-              nx * sgn * (def.kb ?? 55) - ny * (def.kb ?? 55) * 0.45);
+            knockback(e, (-ny * sgn * (def.kb ?? 55) - nx * (def.kb ?? 55) * 0.45) * kbm,
+              (nx * sgn * (def.kb ?? 55) - ny * (def.kb ?? 55) * 0.45) * kbm);
             addEffect(e.x, e.y, 'hit', 18);
           }
         }
@@ -194,6 +206,16 @@ export function updatePieces(dt: number): void {
             knockback(e, 0, -12);
             // 兵符·马蹄符:踏杀即续跳(连跳次数回满——连环不绝,一路踏穿)
             if (e.dead && fuMech(p) === 'chainKill') jp.hopLeft = Math.max(jp.hopLeft, (def.hops ?? 3) - 1);
+          }
+          // 独门·连环马「震荡」:每踏落点散发余波,周围敌人同吃一踏(一踏一片)
+          if (spMech(p) === 'ringHop') {
+            for (const en of state.enemies) {
+              if (en.dead || airborne(en) || en === e) continue;
+              if (dist(jp.tx, jp.ty, en.x, en.y) <= SP_MECH.ringHop.radius) {
+                damageEnemy(en, jp.dmg * SP_MECH.ringHop.dmg, 0, p);
+              }
+            }
+            addEffect(jp.tx, jp.ty, 'stomp', SP_MECH.ringHop.radius);
           }
           addEffect(jp.tx, jp.ty, 'hit', 16);
           if (Math.random() < 0.7) addEffect(jp.tx, jp.ty, 'dust', 10);
@@ -235,6 +257,18 @@ export function updatePieces(dt: number): void {
       knockback(t, 0, -(def.kb ?? 22));
       addEffect(pos.x, pos.y + 22, 'stab', 0, t.x, t.y);
       addEffect(t.x, t.y, 'hit', 14);
+      // 独门·过河兵「贯穿」:刺穿首个目标,连带其身后最近一敌(一刺两敌)
+      if (spMech(p) === 'pierce') {
+        const behind = state.enemies.filter(e2 => !e2.dead && !airborne(e2) && e2 !== t
+          && t.y - e2.y > 8 && t.y - e2.y <= SP_MECH.pierce.depth
+          && Math.abs(e2.x - t.x) <= SP_MECH.pierce.band);
+        if (behind.length) {
+          const b2 = maxBy(behind, e2 => e2.y);
+          damageEnemy(b2, s.dmg * SP_MECH.pierce.dmg, 0, p);
+          addEffect(t.x, t.y - 10, 'stab', 0, b2.x, b2.y);
+          addEffect(b2.x, b2.y, 'hit', 12);
+        }
+      }
       if (Math.random() < 0.6) addEffect(t.x, t.y + 18, 'dust', 8);
     } else if (def.mode === 'hop') {
       /* 马:连跳——自己跳进敌群连踏三跳,再跳回家 */
@@ -260,6 +294,20 @@ export function updatePieces(dt: number): void {
         sx: mx, sy: my, flown: 0,
         arc: clamp(dist(mx, my, t.x, t.y) * 0.24, 26, 110),
       });
+      // 独门·巡河炮「一炮双落」:主弹之外,次远目标再补一发半力小弹(巡哨左右开弓)
+      if (spMech(p) === 'twinShell') {
+        const rest = inRange.filter(e2 => e2 !== t);
+        if (rest.length) {
+          const t2 = maxBy(rest, e2 => dist(pos.x, pos.y, e2.x, e2.y));
+          state.projectiles.push({
+            mode: 'shell', x: mx, y: my, target: t2, tx: t2.x, ty: t2.y,
+            dmg: s.dmg * SP_MECH.twinShell.dmg,
+            splashR: (def.splashR ?? 90) * s.area * SP_MECH.twinShell.splash, owner: p,
+            sx: mx, sy: my, flown: 0,
+            arc: clamp(dist(mx, my, t2.x, t2.y) * 0.24, 26, 110),
+          });
+        }
+      }
       addEffect(mx, my, 'muzzle', 16);
     } else if (def.mode === 'charge') {
       /* 车:冲阵——瞄准血最厚目标直线冲出;每碾压一敌减速,命中数达上限即折返(人海挡车) */

@@ -3,10 +3,11 @@
    ============================================================ */
 import type { Enemy, EffectType, Projectile, Piece, Zone } from '../types';
 import { state, cellCenter } from '../state';
-import { W, MAXLV, MERGE, XP, xpNeed, FU_DROP, FU_MECH } from '../config';
+import { W, MAXLV, MERGE, XP, xpNeed, FU_DROP, FU_MECH, SP_MECH } from '../config';
 import { addShards } from '../save';
 import { findSkill, immuneKnock, airborne, mountShieldActive } from './skills';
 import { clamp, rand, dist } from './geometry';
+import { SPECIALS } from '../data/specials';
 
 /** 特殊军吃经验:击杀敌军按威胁档加经验,攒满 need×等级升 1 级(替代合成升级) */
 function grantXP(p: Piece, e: Enemy): void {
@@ -80,8 +81,13 @@ export function damageEnemy(e: Enemy, dmg: number, slow: number, by?: Piece | nu
 /** 炮:落点溅射,半径内敌人全额伤害(落地爆炸特效);腾空中的 Boss 挨不着 */
 export function shellHit(pr: Projectile): void {
   addEffect(pr.tx, pr.ty, 'boom', pr.splashR);
+  // 独门·担竿炮「震停」:重锤落地,溅到的敌人被砸停在原地(与车辕符同用 pauseT 语义)
+  const stun = pr.owner && SPECIALS[pr.owner.tag ?? '']?.mech === 'stunShell' ? SP_MECH.stunShell.pause : 0;
   for (const e of state.enemies) {
-    if (!e.dead && !airborne(e) && dist(e.x, e.y, pr.tx, pr.ty) <= pr.splashR) damageEnemy(e, pr.dmg, 0, pr.owner ?? null);
+    if (!e.dead && !airborne(e) && dist(e.x, e.y, pr.tx, pr.ty) <= pr.splashR) {
+      damageEnemy(e, pr.dmg, 0, pr.owner ?? null);
+      if (stun && !e.dead) e.pauseT = Math.max(e.pauseT, stun);
+    }
   }
 }
 
