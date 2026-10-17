@@ -191,15 +191,24 @@ export function onWaveStart(): void {
   if (boardGear('xian')) {
     const fx = gearOf('xian')?.fx;
     if (fx?.trapR && fx.trapDur) {
+      const R = fx.trapR, DUR = fx.trapDur;
       // 每条行军道各落一片:两路都有坑,敌军无论走哪条都得趟过去。
       // 位置取路线 62% 处(帅侧半场:让减速发生在自家火力覆盖内,才叫「陷马」);
-      // 若恰好落在楚河水面(路线 50% 附近常是桥),再往后挪到 78% —— 泥沼画在水上既怪又没用
+      // 若恰好落在楚河水面(路线 50% 附近常是桥),往后挪到 78% —— 泥沼画在水上既怪又没用。
+      // 再退一步:中心合流图的两路走到这里**已经并道**(两点仅差几十像素)→ 只留一片挡在合流口,
+      // 否则两片糊成一坨既看不出「两路各一」,也白费一件
       const river = state.map.river;
+      const placed: Point[] = [];
       for (const pts of state.paths) {
         if (pts.length < 2) continue;
-        let mid = routeAt(pts, 0.62);
-        if (mid.y >= river.y && mid.y <= river.y + river.h) mid = routeAt(pts, 0.78);
-        addZone('slow', mid.x, mid.y, fx.trapR, fx.trapDur);
+        for (const k of [0.62, 0.78]) {
+          const p = routeAt(pts, k);
+          if (p.y >= river.y && p.y <= river.y + river.h) continue;
+          if (placed.some(q => dist(p.x, p.y, q.x, q.y) < R * 1.2)) continue;
+          placed.push(p);
+          addZone('slow', p.x, p.y, R, DUR);
+          break;
+        }
       }
     }
   }
