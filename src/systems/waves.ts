@@ -82,9 +82,12 @@ function applyElite(g: WaveGroup[], n: number): void {
   if (state.mode !== 'endless' || n < ENDLESS.eliteFrom) return;
   const zu = g.find(gr => gr.t === '卒');
   if (!zu) return;
+  // 换卒上限:基础 75%,深波(eliteDeepFrom 起)每波 +0.8pt、至 92% 封顶——构成不封冻
+  const share = Math.min(ENDLESS.eliteDeepCap,
+    ENDLESS.eliteMaxShare + Math.max(0, n - ENDLESS.eliteDeepFrom) * ENDLESS.eliteDeepStep);
   const conv = Math.min(
     Math.round((n - ENDLESS.eliteFrom + 1) * ENDLESS.elitePerWave),
-    Math.floor(zu.n * ENDLESS.eliteMaxShare),
+    Math.floor(zu.n * share),
   );
   if (conv <= 0) return;
   zu.n -= conv;

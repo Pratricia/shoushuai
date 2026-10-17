@@ -11,7 +11,7 @@
 import type { Point, Boat } from '../types';
 import { state } from '../state';
 import { W, ENEMIES, NAVY, TIDE, ENDLESS } from '../config';
-import { waveMul, waveSpdMul } from './enemies';
+import { waveMul, waveSpdMul, rollVet } from './enemies';
 import { addEffect, addFloat } from './combat';
 
 /** 河带几何(与 board.ts 底图同一套推导):top/bot/mid */
@@ -91,23 +91,25 @@ export function sendBoat(wave: number, stagger = 0, k = 0): void {
   });
 }
 
-/** 水军下船:强度吃 所属波次 系数 + 敌潮(与同波出怪等价),沿船载路线行军 */
+/** 水军下船:强度吃 所属波次 系数 + 敌潮(与同波出怪等价),沿船载路线行军;
+ *  精锐散兵与陆上同一条概率轴(抢滩的硬点子) */
 function spawnMarine(b: Boat): void {
   const def = ENEMIES['水'];
   const w0 = Math.max(0, b.wave - 1);
   const tide = 1 + TIDE.hpPerSec * state.levelT;
   const hpMul = tide * waveMul(w0);
+  const vt = rollVet(w0, false);
   state.enemies.push({
     type: '水',
     x: b.x + b.dir * 26, y: b.y + 4,
-    hp: def.hp * hpMul, maxHp: def.hp * hpMul,
-    spd: def.spd * waveSpdMul(w0) * (1 + TIDE.spdPerSec * state.levelT),
+    hp: def.hp * hpMul * vt.hp, maxHp: def.hp * hpMul * vt.hp,
+    spd: def.spd * waveSpdMul(w0) * (1 + TIDE.spdPerSec * state.levelT) * vt.spd,
     slowT: 0, kbT: 0, armorBreakT: 0, walkPh: Math.random() * Math.PI * 2,
     pauseT: 0, dead: false,
     aimT: 0, aimX: 0, aimY: 0, shotDone: false, tide,
-    r: def.r,
-    gold: def.gold + Math.floor(w0 / ENDLESS.goldPer6),
-    dmg: def.dmg, boss: null,
+    r: def.r + (vt.vet ? 2 : 0),
+    gold: (def.gold + Math.floor(w0 / ENDLESS.goldPer6)) * vt.gold,
+    dmg: def.dmg, boss: null, vet: vt.vet,
     path: b.path, wpi: 1,
   });
 }

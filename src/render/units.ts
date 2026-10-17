@@ -535,6 +535,19 @@ function drawEnemy(e: Enemy): void {
     ctx.lineWidth = 2;
     ctx.stroke();
   }
+  if (e.vet) {
+    // 精锐散兵:描金外环 + 右上「精」字戳——混在潮里的硬点子,一眼可辨
+    ctx.strokeStyle = '#ffd54f';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, e.r + 4, 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd54f';
+    setFont(Math.round(e.r * 0.52), true);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('精', e.r * 0.72, -e.r * 0.72);
+  }
   if (e.boss) {
     /* 技能→造型映射(数据驱动:有什么技能就长什么样) */
     if (findSkill(e, 'armor')) {

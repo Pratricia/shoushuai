@@ -45,6 +45,17 @@ function bossWaveRamp(w0: number): number {
   return 1 + (waveMul(w0) - 1) * ENDLESS.bossRampShare;
 }
 
+/** 精锐散兵判定(仅无限模式;水军同吃,见 navy.ts):深波起普通敌军按概率
+ *  以「精锐」出场——个体质量轴,随波上行、永不封冻(构成替换会饱和,它不会)。
+ *  返回血量/速度/赏粮倍率(非精锐恒 1);Boss 不参与(它有克隆定义 + bossWaveRamp) */
+export function rollVet(w0: number, boss: boolean): { hp: number; spd: number; gold: number; vet: boolean } {
+  if (boss || state.mode !== 'endless' || w0 < ENDLESS.vetFrom) return { hp: 1, spd: 1, gold: 1, vet: false };
+  if (rand(0, 1) >= Math.min(ENDLESS.vetCap, (w0 - ENDLESS.vetFrom) * ENDLESS.vetPerWave)) {
+    return { hp: 1, spd: 1, gold: 1, vet: false };
+  }
+  return { hp: ENDLESS.vetHp, spd: ENDLESS.vetSpd, gold: ENDLESS.vetGold, vet: true };
+}
+
 /** 一兵出场时的数值(所有出怪路径共用一处,保证同波伏兵不会比正常出的兵更脆/更快)。
  *  血/速 = 关卡层数(血+15%/关、速+2%/关)× 敌潮(随关内时间)× 波次爬坡;
  *  - boss   :不吃敌潮、不吃波次提速——无限模式 Boss 强化 = endlessBoss 克隆(出场序递增)
@@ -70,8 +81,11 @@ export function spawnEnemy(type: EnemyType): void {
     type === '将' ? bd! : ENEMIES[type];
   const endless = state.mode !== 'campaign';
   const w0 = endless ? Math.max(0, state.waveIdx) : 0;
-  const { hp, maxHp, spd, tide } = spawnStats(def, w0, isBoss, true);
-  const gold = def.gold + (endless && !isBoss ? Math.floor(w0 / ENDLESS.goldPer6) : 0);
+  const st = spawnStats(def, w0, isBoss, true);
+  // 精锐散兵(仅无限模式深波):混在潮里的「硬点子」——血厚、略快、赏粮 ×2、体型略大
+  const vt = rollVet(w0, isBoss);
+  const hp = st.hp * vt.hp, maxHp = st.maxHp * vt.hp, spd = st.spd * vt.spd, tide = st.tide;
+  const gold = (def.gold + (endless && !isBoss ? Math.floor(w0 / ENDLESS.goldPer6) : 0)) * vt.gold;
   let path = state.paths[Math.floor(Math.random() * state.paths.length)];
   // 双车错:后出的那骑刻意换一条路(两路齐错);路线用尽才允许同行
   if (bd && (bd.count ?? 1) > 1) {
@@ -86,7 +100,7 @@ export function spawnEnemy(type: EnemyType): void {
     spd, slowT: 0, kbT: 0, armorBreakT: 0, walkPh: Math.random() * Math.PI * 2,
     pauseT: 0, dead: false,
     aimT: 0, aimX: 0, aimY: 0, shotDone: false, tide,
-    r: def.r, gold, dmg: def.dmg, boss: bd,
+    r: def.r + (vt.vet ? 2 : 0), gold, dmg: def.dmg, boss: bd, vet: vt.vet,
     path, wpi: 1,
   });
   if (bd) {

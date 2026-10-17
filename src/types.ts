@@ -201,6 +201,7 @@ export interface Enemy {
   aimX: number; aimY: number; // 砲/当头炮:炮击落点(蓄力时锁定)
   shotDone: boolean;         // 砲:一炮定音——一生只放一发(Boss 炮不设此限,由技能冷却控制)
   tide: number;              // 出生时敌潮系数(≥1,随 levelT 线性;Boss 恒为 1)
+  vet?: boolean;             // 精锐散兵(仅无限模式深波):血量×vetHp、赏粮×vetGold、体型略大、金环「精」记
   dead: boolean;
   r: number; gold: number; dmg: number;
   boss: BossDef | null;    // Boss 定义(普通敌军为 null):数值/技能/造型的数据源
