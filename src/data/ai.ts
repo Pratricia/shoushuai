@@ -15,7 +15,7 @@
    打法不同,但都在同一套机制与资源内 —— 「随机有备而来」,不作弊。
 
     **段位越高,对方「有备而来」的下限越高**:保底件数按我方段位分八档
-    (兵卒近乎裸奔 → 元帅整池军械 + 四枚兵符),再各五成概率多带一件。
+    (兵卒近乎裸奔 → 元帅抽到池子大半 + 四枚兵符),再各五成概率多带一件。
     仍是玩家同款上限(被动 ≤ GEAR_BAG.passiveCap · 主动 ≤ GEAR_BAG.activeCap · 兵符看池),
     所以段位涨的是「对手的牌面」,不是「对手的数值」。
 
@@ -40,35 +40,45 @@ export interface AiPreset {
   boatGap: number;      // 派水军间隔倍率(<1 更勤,>1 更保守)
 }
 
+/* 军械池怎么排的(设计口径):
+   · 一件军械进池 = 玩家在对战里可能被它打到,所以「全部 17 件都得在敌方随机库内」;
+     但**不是每个流派都能抽到任意件**——池按流派性格「分散」发放,流派才有脸:
+       陷马坑 → 兵海铺路后用泥沼拖住来犯      金鼓 → 主动军械更勤(火牛/战鼓/援军令)
+       中军大纛 → 围着帅成军,光环越铺越广    背水一战 → 残血全军提速,搏命快攻
+       免死符 + 屯田令 → 死守住土,垦一寸返一分粮
+   · 主动池本来就覆盖全部 5 件(每个流派 3 件,合起来 5 件齐全),故只补被动。
+   · **垦荒令(ken)故意不进池**:AI 开垦走的是「每两波 +1 格的额度」(aiCellCap),
+     不花令牌;`onWaveStart` 会给它加 kens 但它从不消费 → 进池等于白占一格。
+     哪天给它加一条「用令牌开垦」的机制,再放进来。 */
 export const AI_PRESETS: AiPreset[] = [
   {
     id: 'infantry', name: '卒伍兵海', desc: '以量取胜,兵海铺路层层并子',
     favors: ['兵', '相'], tileUrge: 0.5, tileReserve: 2, sellFloor: 1,
-    passive: ['cang', 'laozu', 'ling'], active: ['gu', 'ling2', 'suo'], fu: ['zu', 'ma', 'che', 'shi'],
+    passive: ['cang', 'laozu', 'ling', 'xian'], active: ['gu', 'ling2', 'suo'], fu: ['zu', 'ma', 'che', 'shi'],
     boatGap: 1.0,
   },
   {
     id: 'artillery', name: '轰天炮阵', desc: '远火覆盖,炮车齐鸣溅射清场',
     favors: ['炮', '车'], tileUrge: 0.62, tileReserve: 2, sellFloor: 1,
-    passive: ['cang', 'lian', 'laozu'], active: ['niu', 'gu', 'ling2'], fu: ['pao', 'che', 'zu', 'ma'],
+    passive: ['cang', 'lian', 'laozu', 'jin'], active: ['niu', 'gu', 'ling2'], fu: ['pao', 'che', 'zu', 'ma'],
     boatGap: 1.05,
   },
   {
     id: 'strategist', name: '军师字阵', desc: '以军为核,攒字牌成军倍率碾压',
     favors: ['马', '炮'], tileUrge: 1.0, tileReserve: 1, sellFloor: 1,
-    passive: ['ling', 'laozu', 'cang'], active: ['ling2', 'suo', 'gu'], fu: ['ma', 'pao', 'zu', 'xiang', 'shi'],
+    passive: ['ling', 'laozu', 'cang', 'da'], active: ['ling2', 'suo', 'gu'], fu: ['ma', 'pao', 'zu', 'xiang', 'shi'],
     boatGap: 1.15,
   },
   {
     id: 'fortress', name: '铁壁守土', desc: '碾阵拒止,车相配合定身慢刀',
     favors: ['车', '相', '兵'], tileUrge: 0.6, tileReserve: 2, sellFloor: 1,
-    passive: ['bi', 'laozu', 'cang'], active: ['ling2', 'suo', 'yao'], fu: ['che', 'xiang', 'shi', 'zu'],
+    passive: ['bi', 'laozu', 'cang', 'mian', 'tian'], active: ['ling2', 'suo', 'yao'], fu: ['che', 'xiang', 'shi', 'zu'],
     boatGap: 1.35,
   },
   {
     id: 'cavalry', name: '轻骑突袭', desc: '快攻压制,马踏连营水军频出',
     favors: ['马', '车', '兵'], tileUrge: 0.5, tileReserve: 2, sellFloor: 1,
-    passive: ['lian', 'cang', 'laozu'], active: ['gu', 'ling2', 'niu'], fu: ['ma', 'che', 'pao', 'shi'],
+    passive: ['lian', 'cang', 'laozu', 'bei'], active: ['gu', 'ling2', 'niu'], fu: ['ma', 'che', 'pao', 'shi'],
     boatGap: 0.85,
   },
 ];
@@ -98,8 +108,9 @@ export interface AiLoadoutFloor {
 
 /** 段位 → 对方开局「有备而来」的保底件数(八档,与 RANKS 一一对应)
  *    兵卒 只 1 被动 1 主动、兵符保底 0     (对面也就个新兵蛋子)
- *    元帅 整池军械 + 四枚兵符             (对面也是老兵,牌面给足)
- *  仍是玩家同款上限:被动 ≤ GEAR_BAG.passiveCap(池 3)、主动 ≤ GEAR_BAG.activeCap、兵符看池。 */
+ *    元帅 抽到池子大半 + 四枚兵符         (对面也是老兵,牌面给足)
+ *  仍是玩家同款上限:被动 ≤ GEAR_BAG.passiveCap(6;而流派池只有 4~5 件,
+ *  故高档位实际是「池子基本抽干」)、主动 ≤ GEAR_BAG.activeCap(2;池 3)、兵符看池。 */
 const AI_FLOOR: AiLoadoutFloor[] = [
   { passive: 1, active: 1, fu: 0 },   // 兵卒
   { passive: 1, active: 1, fu: 1 },   // 伍长
