@@ -411,6 +411,7 @@ export function marchEnemies(dt: number): void {
         }
       }
       state.hearts -= e.dmg;
+      state.hurtT = 0.55;      // 受击红幕脉冲(观感层,衰减见 updatePieces)
       addEffect(shuai.x, shuai.y - 6, 'palace', 0);
       addFloat(shuai.x, shuai.y - 50, '-' + e.dmg, '#a93226', 26);
       // 军械·免死符:致命一击改为留在 1 血(每局仅一次;对战双方各认自己的武装册)
@@ -430,6 +431,7 @@ export function marchEnemies(dt: number): void {
           state.moneyNote = '血战 ' + (state.waveIdx + 1) + ' 波';
         }
         state.screen = 'over';
+        state.screenT = 0;
       }
     }
   }

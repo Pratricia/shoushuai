@@ -40,7 +40,7 @@ function initial(): GameState {
     fuSet: {},
     gearCd: {},
     maxHearts: HEARTS,
-    drumT: 0,
+    drumT: 0, hurtT: 0, screenT: 0,
     kens: 0,
     barracks: [null, null, null, null, null],
     grid: new Map(),
@@ -135,6 +135,8 @@ function resetBattle(map: MapDef, open: [number, number][], gold: number, hearts
   state.moneyGain = 0;
   state.moneyNote = '';
   state.rankUp = null;
+  state.hurtT = 0;
+  state.screenT = 0;
   // 技能槽:按存档装载主动军械(只有装进槽的主动技生效)
   // 武装册:本棋盘实际生效的军械 = 已携带的被动 + 已装槽的主动
   // (对战对方在 duelBoard/setupDuel 里覆盖为随机预设;未携带的被动不进册 → 一律不生效)

@@ -20,13 +20,13 @@ import { AI_PRESETS } from './data/ai';
 import { DUEL, ENDLESS, KEN, ECON, GEAR_BAG } from './config';
 import { LEVELS } from './data/levels';
 import { handleDown, endDrag, cycleSpeed, installInput, shopPointerMove, shopPointerUp } from './input';
-import { drawBoard, drawGridCells, drawGates, drawPalace } from './render/board';
+import { drawBoard, drawGridCells, drawGates, drawPalace, drawRiverFx } from './render/board';
 import { drawShuai, drawBarracks, drawHUD, drawBag } from './render/hud';
 import { drawDuelHud } from './render/duel';
 import { drawMenuBg } from './render/menuBg';
 import {
   drawEnemies, drawPieces, drawProjectiles, drawShells, drawEffects,
-  drawFloats, drawToast, drawDrag, drawBoats, drawBossBanner, drawZones,
+  drawFloats, drawToast, drawDrag, drawBoats, drawBossBanner, drawZones, drawHurtVignette,
 } from './render/units';
 import { drawOverlays, scrollShop, getShopScroll, getShopListRect, resetShopScroll } from './render/overlays';
 
@@ -60,6 +60,7 @@ function update(dt: number): void {
 function renderDuel(): void {
   setBoard(duel.player);       // 静态层用哪块棋盘都一样(两块共用同一张镜像竞技场 map)
   drawBoard();                 // 静态底图:两半台地 + 中央楚河汉界 + 两座帅台
+  drawRiverFx();               // 中央河面流光+雾带(对战共用一条河)
   drawGates();                 // 四座出怪口城楼(两条路线共用;先落地,好让双方棋子都压在它之上)
   // 对方半场:荒地封印 → 地面装饰 → 帅台 → 楼船/敌军 → 棋子与飞行物
   setBoard(duel.rival);
@@ -87,6 +88,7 @@ function renderDuel(): void {
   drawShells();
   drawEffects();
   drawFloats();
+  drawHurtVignette();          // 我方受击红幕(读我方棋盘的 hurtT)
   drawDuelHud();
   drawBarracks();
   drawBag();
@@ -111,6 +113,7 @@ function render(): void {
   }
   if (duel.on) { renderDuel(); return; }
   drawBoard();
+  drawRiverFx();      // 河面流光+雾带(氛围层,裁剪在河带内)
   drawGridCells();
   drawPalace();
   drawZones();      // 兵符区域:灼烧火场/减速沼泽(地面贴片,棋子上方之下)
@@ -127,6 +130,7 @@ function render(): void {
   drawShells();
   drawEffects();
   drawFloats();
+  drawHurtVignette();  // 帅受击红幕脉冲(纯色彩脉冲,非镜头震动)
   drawToast();
   drawDrag();
   drawOverlays();
@@ -143,8 +147,11 @@ function frame(now: number): void {
   updateToast(raw);   // 提示条走真实时间:任何画面都会正常淡出
   if (duel.on) {
     if (!duel.over && !duel.player.paused) updateDuel(raw * duel.player.speed, updateBoard);
+    if (duel.over) duel.player.screenT += raw;   // 结算朱印盖章走真实时间(定格页不推进游戏)
   } else if (state.screen === 'play' && !state.paused) {
     updateBoard(raw * state.speed);
+  } else if (state.screen === 'clear' || state.screen === 'win' || state.screen === 'over') {
+    state.screenT += raw;
   }
   render();
   requestAnimationFrame(frame);

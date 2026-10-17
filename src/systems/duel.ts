@@ -118,6 +118,7 @@ function endDuel(loser: 'player' | 'rival'): void {
   p.rankUp = won ? recordDuelWin() : (recordDuelLoss(), null);
   setBoard(p);
   p.screen = won ? 'win' : 'over';
+  p.screenT = 0;
 }
 
 /* ============================================================

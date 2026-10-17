@@ -309,6 +309,8 @@ export interface GameState {
   gearCd: Record<string, number>;  // 主动军械冷却剩余秒数 id -> 剩余
   maxHearts: number;         // 本局帅血上限(灵药回复不超过此值)
   drumT: number;             // 战鼓:全军攻速加成剩余秒数(0 = 无)
+  hurtT: number;             // 帅受击红幕脉冲剩余秒(纯观感,非镜头震动)
+  screenT: number;           // 进入结算页后的真实秒数(朱印盖章动画自变量)
   kens: number;             // 垦荒令数量(征兵随机掉落)
   barracks: (Piece | null)[];
   grid: Map<string, Piece>; // 'c,r' -> 棋子

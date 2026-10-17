@@ -118,6 +118,8 @@ function stompLand(p: Piece): void {
 export function updatePieces(dt: number): void {
   // 擂鼓:全军攻速加成倒计时(随倍速同步,游戏内时间)
   if (state.drumT > 0) state.drumT = Math.max(0, state.drumT - dt);
+  // 受击红幕脉冲衰减(真实手感:挨打瞬间红幕一闪,0.55s 内退场)
+  if (state.hurtT > 0) state.hurtT = Math.max(0, state.hurtT - dt);
   for (const [k, p] of state.grid) {
     if (k !== p.c + ',' + p.r) continue;           // 特殊军双格登记:只处理主格一次
     if (isTile(p.type)) continue;               // 字牌零件不作战,只等成军

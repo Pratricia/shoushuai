@@ -44,6 +44,7 @@ export function levelClear(): void {
   state.moneyGain = n;
   state.moneyNote = first ? '首通犒赏' : '复通犒赏';
   state.screen = state.level >= LEVELS.length ? 'win' : 'clear';
+  state.screenT = 0;
 }
 
 /** 波次推进:连续出兵——当前波出完即按关卡 gap 进下一波,不等场上清空;

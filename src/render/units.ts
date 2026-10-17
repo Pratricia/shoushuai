@@ -3,8 +3,8 @@
    ============================================================ */
 import type { Piece, TileType, Point, Enemy, Boat, Effect } from '../types';
 import { ctx, rr, setFont } from '../canvas';
-import { TAU, W, MAXLV, PIECES, TIER, SHELL, TIDE, NAVY, MERGE, xpNeed } from '../config';
-import { state, cellCenter, cellAt, slotCenter } from '../state';
+import { TAU, W, H, MAXLV, PIECES, TIER, SHELL, TIDE, NAVY, MERGE, xpNeed } from '../config';
+import { state, duel, cellCenter, cellAt, slotCenter } from '../state';
 import { pieceStats } from '../systems/pieces';
 import { findSkill, mountShieldActive } from '../systems/skills';
 import { fusionHints } from '../systems/fusion';
@@ -173,6 +173,19 @@ export function drawPiece(x: number, y: number, p: Piece, size: number): void {
 function drawSpecialPiece(p: Piece, cc: Point): void {
   const v = p.vec!;
   const B = cellCenter(p.c + v.dc, p.r + v.dr);
+  /* 金环呼吸:成军特殊军的精英感一眼可辨——地贴光晕铺在连体座之下,
+     只发光不遮挡(相位按格位错开,满盘军各自呼吸不齐步) */
+  {
+    const mx = (cc.x + B.x) / 2, my = (cc.y + B.y) / 2;
+    const br = 0.5 + 0.5 * Math.sin(state.levelT * 2.2 + p.c * 3 + p.r);
+    const ag = ctx.createRadialGradient(mx, my, 8, mx, my, 52 + br * 6);
+    ag.addColorStop(0, 'rgba(249,168,37,' + (0.10 + br * 0.07).toFixed(3) + ')');
+    ag.addColorStop(1, 'rgba(249,168,37,0)');
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.arc(mx, my, 58, 0, TAU);
+    ctx.fill();
+  }
   /* 车:冲阵中——原位连体座留虚影,本体画在冲撞位置 */
   if (p.charge) {
     const ch = p.charge;
@@ -1458,6 +1471,20 @@ export function drawToast(): void {
   ctx.fillStyle = '#f2e8d0';
   ctx.fillText(state.toast.text, 360, ty + 28);
   ctx.globalAlpha = 1;
+}
+
+/** 帅受击红幕脉冲:挨打瞬间屏幕四缘泛红、0.55s 退场——
+ *  纯色彩脉冲(不是镜头震动,画面零位移);中心留空不糊战场,
+ *  对战读我方棋盘的 hurtT(对方挨打不闪我的屏) */
+export function drawHurtVignette(): void {
+  const ht = duel.on ? duel.player.hurtT : state.hurtT;
+  if (ht <= 0) return;
+  const a = (ht / 0.55) * 0.38;
+  const g = ctx.createRadialGradient(360, 640, 260, 360, 640, 700);
+  g.addColorStop(0, 'rgba(165,48,31,0)');
+  g.addColorStop(1, 'rgba(165,48,31,' + a.toFixed(3) + ')');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
 }
 
 /* ---------- 拖拽中的棋子 / 垦荒令 ---------- */

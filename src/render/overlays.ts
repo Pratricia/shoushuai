@@ -738,6 +738,41 @@ function renderPause(): void {
 
 /* ---------- 结算 ---------- */
 
+/** 朱印/墨印盖章:overshoot 缩放入印 + 落定冲击环——结算页的「落笔仪式感」。
+ *  t = 进入结算页后的真实秒数(screenT,由主循环 frame 推进,定格页也走) */
+function drawSeal(x: number, y: number, ch: string, t: number, dark: boolean): void {
+  const k = Math.min(1, t / 0.45);
+  if (k <= 0) return;
+  const u = k - 1;
+  const e = 1 + 2.70158 * u * u * u + 1.70158 * u * u;   // easeOutBack:2.6× 砸到 1× 微过冲
+  const sc = 2.6 - 1.6 * e;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  ctx.globalAlpha = Math.min(1, t / 0.12) * 0.92;
+  ctx.strokeStyle = dark ? '#33302a' : '#c62828';
+  ctx.lineWidth = 5;
+  rr(-34, -34, 68, 68, 10);
+  ctx.stroke();
+  ctx.fillStyle = dark ? '#33302a' : '#c62828';
+  setFont(46, true);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ch, 0, 3);
+  ctx.restore();
+  // 落定一刻的冲击环(0.45s 后绽开 0.35s)
+  const q = (t - 0.45) / 0.35;
+  if (q > 0 && q < 1) {
+    ctx.globalAlpha = (1 - q) * 0.45;
+    ctx.strokeStyle = dark ? '#6b655c' : '#f9a825';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, 40 + 46 * q, 0, TAU);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
 function renderClear(): void {
   dim();
   // 胜利横幅
@@ -749,6 +784,7 @@ function renderClear(): void {
   ctx.fillStyle = '#43a047';
   setFont(68, true);
   ctx.fillText('守住了!', 360, 478);
+  drawSeal(545, 468, '胜', state.screenT, false);
   drawMoneyGain(545);
   // 主按钮:下一关(置于视角中心)
   rr(200, 585, 320, 110, 18);
@@ -798,6 +834,7 @@ function renderOver(): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('帅陨落…', 360, 510);
+  drawSeal(545, 505, '败', state.screenT, true);
   ctx.fillStyle = INK;
   setFont(24, false);
   // 战绩:无限模式报坚守波数;对战报对垒波数;战役报关卡/波次
@@ -831,6 +868,7 @@ function renderWin(): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(duelWin ? '对垒胜局!' : '五十关全通!', 360, duelWin ? 500 : 530);
+  drawSeal(545, duelWin ? 495 : 525, '胜', state.screenT, false);
   ctx.fillStyle = '#8a7a5c';
   setFont(22, false);
   ctx.fillText(duelWin ? '敌军先破帅 · 血战 ' + (state.waveIdx + 1) + ' 波' : '灰盒阶段毕业 · 下一站:对战版', 360, duelWin ? 546 : 595);

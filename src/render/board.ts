@@ -791,6 +791,38 @@ export function drawGates(): void {
     ctx.fillStyle = '#14100a';
     ctx.fill();
     ctx.restore();
+    // 火盆:门洞两侧夯土丘上的一对盆火(火光明灭,城楼从此有「人气」);
+    // 位置贴地(门洞侧 ±32),不向顶栏/兵营方向伸展,零遮挡
+    const m = up ? -1 : 1;
+    const fl = 0.5 + 0.5 * Math.sin(state.levelT * 11 + gx * 0.7);
+    const hot = 0.22 + 0.12 * fl + (state.enemies.length > 0 ? 0.06 : 0);
+    for (const sx of [gx - 32, gx + 32]) {
+      const fy = gy + m * 26;
+      const fg = ctx.createRadialGradient(sx, fy, 1, sx, fy, 20);
+      fg.addColorStop(0, 'rgba(255,176,64,' + hot.toFixed(3) + ')');
+      fg.addColorStop(1, 'rgba(255,120,20,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(sx, fy, 20, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#ffd54f';
+      ctx.beginPath();
+      ctx.ellipse(sx, fy, 2.6, 3.6 + fl * 1.6, 0, 0, TAU);
+      ctx.fill();
+    }
+    // 门洞出兵脉冲:波间倒计时最后 1.2s 门洞红光呼吸——「敌军即将涌出」的预告
+    if (state.screen === 'play' && state.interWave > 0 && state.interWave < 1.2) {
+      const k = 1 - state.interWave / 1.2;
+      ctx.globalAlpha = 0.25 + 0.2 * Math.sin(state.levelT * 14);
+      const dg = ctx.createRadialGradient(gx, gy + m * 24, 4, gx, gy + m * 24, 34 + k * 10);
+      dg.addColorStop(0, 'rgba(217,68,42,0.8)');
+      dg.addColorStop(1, 'rgba(217,68,42,0)');
+      ctx.fillStyle = dg;
+      ctx.beginPath();
+      ctx.arc(gx, gy + m * 24, 44, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     // 城楼名(不随城楼镜像,永远正着写;让开门洞)
     ctx.fillStyle = '#ece2c6';
     setFont(24, true);
@@ -798,4 +830,59 @@ export function drawGates(): void {
     ctx.textBaseline = 'middle';
     ctx.fillText('敌营', gx, gy + (up ? 13 : -12));
   }
+}
+
+/* ---------- 河面氛围:流光 + 雾带 ----------
+   流光只扫「桥与桥之间的水面段」(不爬桥面);雾带是极低透明度的宽幅漂移,
+   整层裁剪在河带矩形内——不遮平台/崖壁/UI 任何一个可读元素。
+   时间自变量用 levelT:倍速 2×/3× 下河水也流得更快,节奏与画面同步;
+   对战共用中央一条河(双方行军路都不过河,整带皆水面段)。 */
+export function drawRiverFx(): void {
+  const rv = state.map.river;
+  const t = state.levelT;
+  // 桥位:路径里纵穿河带的竖直段 x(与 listBridges 同口径,就地算免引依赖)
+  const bxs: number[] = [];
+  for (const p of state.paths) {
+    for (let i = 0; i + 1 < p.length; i++) {
+      const a = p[i], b = p[i + 1];
+      if (a.x === b.x && Math.min(a.y, b.y) <= rv.y && Math.max(a.y, b.y) >= rv.y + rv.h) bxs.push(a.x);
+    }
+  }
+  const bs = [...new Set(bxs)].sort((x, y) => x - y);
+  const segs: [number, number][] = [];
+  let lo = 10;
+  for (const bx of bs) { segs.push([lo, bx - 46]); lo = bx + 46; }
+  segs.push([lo, 710]);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, rv.y, W, rv.h);
+  ctx.clip();
+  for (const [x0, x1] of segs) {
+    const w = x1 - x0;
+    if (w < 70) continue;
+    for (let i = 0; i < 2; i++) {
+      const span = w + 120;
+      const x = x0 - 60 + ((t * (34 + i * 17) + i * 173 + x0) % span);
+      const y = rv.y + 20 + i * 34 + Math.sin(t * 1.3 + i * 2 + x0) * 5;
+      const g = ctx.createLinearGradient(x - 46, 0, x + 46, 0);
+      g.addColorStop(0, 'rgba(191,227,236,0)');
+      g.addColorStop(0.5, 'rgba(191,227,236,0.14)');
+      g.addColorStop(1, 'rgba(191,227,236,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 46, y, 92, 3);
+    }
+  }
+  // 雾带:两条宽幅慢漂,alpha 极低只做空气感
+  for (let i = 0; i < 2; i++) {
+    const cx = ((t * (9 + i * 4) + i * 431) % 980) - 130;
+    const cy = rv.y + rv.h / 2 + (i === 0 ? -14 : 16);
+    const g = ctx.createRadialGradient(cx, cy, 10, cx, cy, 150);
+    g.addColorStop(0, 'rgba(226,236,236,0.075)');
+    g.addColorStop(1, 'rgba(226,236,236,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 150, 17, 0, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
 }
