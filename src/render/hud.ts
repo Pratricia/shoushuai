@@ -18,6 +18,29 @@ function waveText(groups: WaveGroup[]): string {
   return groups.map(g => g.t + '×' + g.n).join(' ');
 }
 
+/* 顶栏中段文本的可用宽度:左不压「粮」(四位数粮草读数最右约 x119)、
+   右不压暂停键(hit x576)。定值 22px 时深波构成能到 650px+——
+   「无限 · 第99波 卒×20 马×18 车×16 象×16 砲×14 · 水军 将 · 12s」实测 658px,
+   居中后横跨 x31~689,同时吃掉粮草读数和右侧两枚圆键(像素审计抓到 53×24 重叠)。 */
+const HUD_C_MAXW = 430;
+
+/** 顶栏中段:字号随实测宽度自动缩(22→14);仍放不下则把构成裁成前 3 组 +「等」。
+ *  水军/将/倒计时是关键信息,一律放 tail 不参与裁剪。 */
+function drawHudCenter(prefix: string, comp: string, tail: string): void {
+  let text = prefix + (comp ? ' ' + comp : '') + tail;
+  let fs = 22;
+  setFont(fs, true);
+  while (fs > 14 && ctx.measureText(text).width > HUD_C_MAXW) { fs--; setFont(fs, true); }
+  if (ctx.measureText(text).width > HUD_C_MAXW && comp) {
+    const parts = comp.split(' ');
+    if (parts.length > 3) {
+      comp = parts.slice(0, 3).join(' ') + ' 等';
+      text = prefix + ' ' + comp + tail;
+    }
+  }
+  ctx.fillText(text, 360, 30);
+}
+
 /* ---------- 顶栏圆形图标键(战役 / 对战两套顶栏共用) ----------
    两套顶栏高度不同(战役 56px、对战 52px),故圆心与半径由调用方给;
    字形按半径等比推出(条宽 r/4、条高 r−5、字号 r−2),两处都复现原先的手写坐标。
@@ -282,19 +305,19 @@ export function drawHUD(): void {
     if (state.interWave > 0 || state.waveIdx < 0) {
       const nxt = endlessWaveInfo(Math.max(1, state.waveIdx + 2));
       const cd = state.interWave > 0 ? ' · ' + Math.ceil(state.interWave) + 's' : '';
-      ctx.fillText('无限 · 第' + Math.max(1, state.waveIdx + 2) + '波 '
-        + waveText(nxt.groups) + (nxt.navy > 0 ? ' 水军' : '') + (nxt.boss ? ' 将' : '') + cd, 360, 30);
+      drawHudCenter('无限 · 第' + Math.max(1, state.waveIdx + 2) + '波',
+        waveText(nxt.groups), (nxt.navy > 0 ? ' 水军' : '') + (nxt.boss ? ' 将' : '') + cd);
     } else {
-      ctx.fillText('无限 · 第' + (state.waveIdx + 1) + '波 · 敌' + state.enemies.length, 360, 30);
+      drawHudCenter('无限 · 第' + (state.waveIdx + 1) + '波 · 敌' + state.enemies.length, '', '');
     }
   } else {
     const total = LEVELS[state.level - 1].waves.length;
     if (state.interWave > 0 || state.waveIdx < 0) {
       const nxt = LEVELS[state.level - 1].waves[clamp(state.waveIdx + 1, 0, total - 1)];
       const cd = state.interWave > 0 ? ' · ' + Math.ceil(state.interWave) + 's' : '';
-      ctx.fillText('第' + state.level + '关 · 下一波 ' + waveText(nxt) + cd, 360, 30);
+      drawHudCenter('第' + state.level + '关 · 下一波', waveText(nxt), cd);
     } else {
-      ctx.fillText('第' + state.level + '关 · 第' + (state.waveIdx + 1) + '/' + total + '波 · 敌' + state.enemies.length, 360, 30);
+      drawHudCenter('第' + state.level + '关 · 第' + (state.waveIdx + 1) + '/' + total + '波 · 敌' + state.enemies.length, '', '');
     }
   }
   drawPauseBtn(602, 30, 22, { id: 'pause', x: 576, y: 4, w: 52, h: 52 });

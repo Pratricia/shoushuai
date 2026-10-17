@@ -107,12 +107,13 @@ export function spawnEnemy(type: EnemyType): void {
     // 出阵仪式:楚河汉界拉告示横幅(来将何人、什么路数)+ 出生点金环冲击
     state.bossBanner = { name: bd.name, title: bd.title, t: 3.4 };
     addEffect(path[0].x, path[0].y, 'stomp', 110);
-    addFloat(x, path[0].y - 60, bd.name + ' 出阵!', '#a93226', 24);
+    // 飘字自门洞起浮(原 y-60 会飘进顶栏盖住暂停/倍速键;+4 起浮 34px 后止于 82,全程在顶栏之下)
+    addFloat(x, path[0].y + 4, bd.name + ' 出阵!', '#a93226', 24);
   }
   // 敌潮首触:第一只强化敌军出场时提示一次
   if (!state.tideTold && tide >= TIDE.mark) {
     state.tideTold = true;
-    addFloat(path[0].x, path[0].y - 44, '敌潮渐涨 · 来敌强化', '#a93226', 20);
+    addFloat(path[0].x, path[0].y + 8, '敌潮渐涨 · 来敌强化', '#a93226', 20);
   }
 }
 
@@ -425,7 +426,8 @@ export function marchEnemies(dt: number): void {
         // 无限模式殉局发饷:按活过波次计(大考波另加);战役重试不计饷
         if (state.mode === 'endless') {
           state.moneyGain = awardEndless(Math.max(0, state.waveIdx));
-          state.moneyNote = '血战 ' + Math.max(0, state.waveIdx) + ' 波';
+          // 显示口径与结算标题一致(「血战 N 波后失守」用 waveIdx+1);计饷仍按「活过的完整波数」
+          state.moneyNote = '血战 ' + (state.waveIdx + 1) + ' 波';
         }
         state.screen = 'over';
       }

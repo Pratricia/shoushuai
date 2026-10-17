@@ -922,14 +922,16 @@ export function drawBossBanner(): void {
     ctx.stroke();
   }
   // 将名(字距拉开) + 一句话路数
+  // 整体上移半档:原路数文字底缘(cy+27+9.5≈638)会被第 5 行棋子顶(666−39=627)
+  // 压住 11px——棋子画在横幅之上,恰好吃掉字幕下沿;移后字幕盒 607~627 与棋子顶相切
   setFont(40, true);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#f9a825';
-  ctx.fillText(b.name.split('').join(' '), W / 2, cy - 17);
+  ctx.fillText(b.name.split('').join(' '), W / 2, cy - 20);
   setFont(19, false);
   ctx.fillStyle = '#f2e8d0';
-  ctx.fillText(b.title, W / 2, cy + 27);
+  ctx.fillText(b.title, W / 2, cy + 15);
   ctx.restore();
 }
 
@@ -1430,7 +1432,10 @@ export function drawFloats(): void {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = f.color;
-    ctx.fillText(f.text, f.x, f.y - 34 * k);
+    // 顶栏禁入钳制:出怪口飘字(「敌将 出阵!」y=52)上浮 34px 后会压进顶栏(0~56),
+    // 盖住暂停/倍速两枚圆键——钳到 82(顶栏暗边+金线止于 61.5,24px 字半高 19)再淡出
+    const yy = Math.max(82, f.y - 34 * k);
+    ctx.fillText(f.text, f.x, yy);
     ctx.globalAlpha = 1;
   }
 }
@@ -1442,11 +1447,16 @@ export function drawToast(): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const tw = ctx.measureText(state.toast.text).width + 48;
-  rr(360 - tw / 2, 620, tw, 48, 24);
+  /* 提示条落位:河道净空带(584~632)——第 4 行子底 597 / 第 5 行子顶 627 之间,
+     只轻触子缘(原 620 落位深盖第 5 行棋子 41px,而「士不离宫」「荒地未垦」
+     这类规则提示恰恰是玩家在 5~7 行操作时最需要看清的);
+     Boss 横幅占用河道舞台时,临时移到第 5 行子底(705)与第 6 行子顶(735)之间的净空带。 */
+  const ty = state.bossBanner ? 698 : 584;
+  rr(360 - tw / 2, ty, tw, 48, 24);
   ctx.fillStyle = 'rgba(42,34,24,0.88)';
   ctx.fill();
   ctx.fillStyle = '#f2e8d0';
-  ctx.fillText(state.toast.text, 360, 648);
+  ctx.fillText(state.toast.text, 360, ty + 28);
   ctx.globalAlpha = 1;
 }
 
