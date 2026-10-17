@@ -100,9 +100,11 @@ export const KEN_BTN = { x: 512, y: 1104, w: 98, h: 70 };
 /** 战备背包按钮排(兵营上方、垦荒口袋左侧):随身道具点击即用 */
 export const BAG_BTN = { x: 40, y: 1104, w: 80, h: 70, gap: 8 };
 
-/** 军械库·携行规则:主动军械要装进背包(上限 activeCap,对应局内技能按钮数);
-    被动军械解锁即常驻,不限数(不占技能槽) */
-export const GEAR_BAG = { activeCap: 2 };
+/** 军械库·携行规则:主动军械要装进技能槽(上限 activeCap,对应局内技能按钮数);
+    被动军械解锁后自行携带(上限 passiveCap,可随时取下;两者各自成池,互不抢格)。
+    2026-10 定稿改动:被动从「解锁即常驻不限数」改为「携带制 + 上限 passiveCap」——
+    军械库点卡片即携带/取下,只有携带的被动进本局武装册(state.ts 的 gearSet) */
+export const GEAR_BAG = { activeCap: 2, passiveCap: 6 };
 
 /** 每级成长:伤害 / 攻速 / 射程 / 范围类参数(践踏半径、跳跃距离、线长) */
 export const GROWTH = { dmg: 2, cd: 0.93, range: 0.06, area: 0.05 };

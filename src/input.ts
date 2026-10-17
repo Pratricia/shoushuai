@@ -10,14 +10,14 @@
        副格先按原朝向放、放不下试同轴换向;换位规则与常规棋子一致
    ============================================================ */
 import type { Point, DragState, Piece, UIButton } from './types';
-import { state, duel, setBoard, setupLevel, setupEndless, setupDuel, enterMenu, cellAt, cellCenter, slotAt, slotCenter, firstEmptyCell } from './state';
+import { state, duel, setBoard, setupLevel, setupEndless, setupDuel, enterMenu, cellAt, cellCenter, slotAt, slotCenter, firstEmptyCell, boardGear } from './state';
 import { MAXLV, RECYCLE_BTN, KEN_BTN, MERGE, sellValue, GEAR_BAG } from './config';
 import { tryDraft } from './systems/economy';
 import { checkFusions } from './systems/fusion';
 import { isTile } from './data/specials';
 import { GEAR, gearOf } from './data/shop';
 import { FUS } from './data/fu';
-import { saveData, ownsGear, inBag, bagActiveCount, unlockGear, equipGear, unequipGear, craftFu } from './save';
+import { saveData, ownsGear, inBag, bagActiveCount, passiveCarryCount, carriesGear, unlockGear, equipGear, unequipGear, equipPassive, unequipPassive, craftFu } from './save';
 import { useGear } from './systems/items';
 import { duelManualBoat } from './systems/duel';
 import { setShopTab, scrollShop, resetShopScroll, getShopListRect } from './render/overlays';
@@ -250,6 +250,13 @@ function pressButton(b: UIButton): void {
       else if (bagActiveCount() >= GEAR_BAG.activeCap) toast('主动技最多带 ' + GEAR_BAG.activeCap + ' 个——先取出一个');
       else toast('装入失败');
     }
+    else if (g && ownsGear(g.id) && g.kind === 'passive') {
+      // 被动携带制:点卡片即携带/取下(取下只是本局不生效,永久拥有不受影响)
+      if (carriesGear(g.id)) { unequipPassive(g.id); toast(g.name + ' · 已取下 · 开战不再生效'); }
+      else if (equipPassive(g.id)) toast(g.name + ' · 已携带 · 开战生效');
+      else if (passiveCarryCount() >= GEAR_BAG.passiveCap) toast('被动军械最多带 ' + GEAR_BAG.passiveCap + ' 件——先取下一件');
+      else toast('携带失败');
+    }
   }
   else if (b.id === 'unlock' && b.n !== undefined) {
     const g = GEAR[b.n];
@@ -257,7 +264,10 @@ function pressButton(b: UIButton): void {
       if (ownsGear(g.id)) toast(g.name + ' · 已解锁');
       else if (saveData.money < g.cost) toast('军饷不足 · 还差 ' + (g.cost - saveData.money));
       else if (unlockGear(g.id, g.cost)) {
-        if (g.kind === 'passive') toast(g.name + ' · 已解锁 · 常驻生效');
+        if (g.kind === 'passive') {
+          if (carriesGear(g.id)) toast(g.name + ' · 已解锁并携带');
+          else toast(g.name + ' · 已解锁(被动已带满 ' + GEAR_BAG.passiveCap + ' 件,点卡片取舍)');
+        }
         else if (inBag(g.id)) toast(g.name + ' · 已解锁并装入技能槽');
         else toast(g.name + ' · 已解锁(主动技槽已满,点卡片装入)');
       } else toast('解锁失败');
@@ -424,8 +434,8 @@ function mergeFeedback(x: number, y: number, p: Piece): void {
   p.mergeT = MERGE.flash;                 // 盘面弹亮(渲染读它画微弹 + 刻环发亮)
   addEffect(x, y, 'merge', MERGE.ringR);  // 细金双环轻扬(纯描边、快速渐散,不糊视野)
   addFloat(x, y - 40, '合成 Lv' + p.lv, '#b8860b', 22);
-  // 军械·连弩机(解锁即常驻):每次合成返还粮草
-  if (ownsGear('lian')) {
+  // 军械·连弩机(本棋盘武装册:携带才生效;对战里双方各认自己那份)
+  if (boardGear('lian')) {
     const n = gearOf('lian')?.fx.mergeGold ?? 0;
     if (n > 0) { state.gold += n; addFloat(x, y - 66, '+' + n + ' 粮', '#b8860b', 18); }
   }

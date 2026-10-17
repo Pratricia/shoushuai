@@ -11,13 +11,13 @@ import { updateTimers, updateToast, damageEnemy, updateZones } from './systems/c
 import { tryDraft } from './systems/economy';
 import { useGear, drumRate, tickGear, onWaveStart } from './systems/items';
 import { updateDuel, duelManualBoat, duelFieldCount } from './systems/duel';
-import { saveData, awardCampaign, awardEndless, awardDuel, resetSave, bagList, bagActiveCount, passiveCount,
-  ownsGear, inBag, unlockGear, equipGear, unequipGear, addShards, craftFu, fuOf,
+import { saveData, awardCampaign, awardEndless, awardDuel, resetSave, bagList, bagActiveCount, passiveList, passiveCarryCount, passiveOwnedCount, carriesGear,
+  ownsGear, inBag, unlockGear, equipGear, unequipGear, equipPassive, unequipPassive, addShards, craftFu, fuOf,
   duelRankState, recordDuelWin, recordDuelLoss } from './save';
 import { GEAR } from './data/shop';
 import { RANKS, rankAt, rankTitle, advanceRank, winsToPromote, levelCn } from './data/ranks';
 import { AI_PRESETS } from './data/ai';
-import { DUEL, ENDLESS, KEN, ECON } from './config';
+import { DUEL, ENDLESS, KEN, ECON, GEAR_BAG } from './config';
 import { handleDown, endDrag, cycleSpeed, installInput, shopPointerMove, shopPointerUp } from './input';
 import { drawBoard, drawGridCells, drawGates, drawPalace } from './render/board';
 import { drawShuai, drawBarracks, drawHUD, drawBag } from './render/hud';
@@ -164,9 +164,10 @@ window.__game = {
   items: { useGear, drumRate, tickGear, onWaveStart },
   shop: { scrollShop, getShopScroll, getShopListRect, resetShopScroll, move: shopPointerMove, up: shopPointerUp },
   save: { data: saveData, awardCampaign, awardEndless, awardDuel, resetSave,
-    bagList, bagActiveCount, passiveCount, ownsGear, inBag, unlockGear, equipGear, unequipGear,
+    bagList, bagActiveCount, passiveList, passiveCarryCount, passiveOwnedCount, carriesGear, ownsGear, inBag,
+    unlockGear, equipGear, unequipGear, equipPassive, unequipPassive,
     addShards, craftFu, fuOf, duelRankState, recordDuelWin, recordDuelLoss },
   ranks: { RANKS, rankAt, rankTitle, advanceRank, winsToPromote, levelCn },
   gear: GEAR,
-  config: { DUEL, ENDLESS, KEN, ECON },   // 灰盒调参:对战/无限波面压力现场 A/B
+  config: { DUEL, ENDLESS, KEN, ECON, GEAR_BAG },   // 灰盒调参:对战/无限波面压力、军械携行上限现场 A/B
 };

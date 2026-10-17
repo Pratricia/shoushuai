@@ -6,7 +6,7 @@ import { W, H, TAU, PAPER, INK, GEAR_BAG } from '../config';
 import { state } from '../state';
 import { LEVELS } from '../data/levels';
 import { getMap } from '../data/maps';
-import { saveData, ownsGear, inBag, bagList, bagActiveCount, passiveCount, duelRankState } from '../save';
+import { saveData, ownsGear, inBag, bagList, bagActiveCount, passiveList, passiveCarryCount, passiveOwnedCount, carriesGear, duelRankState } from '../save';
 import { GEAR, gearOf } from '../data/shop';
 import type { GearDef } from '../data/shop';
 import { rankTitle, levelCn, rankAt, winsToPromote } from '../data/ranks';
@@ -357,7 +357,7 @@ function renderShop(): void {
 
   // 页签:军械库 / 兵符
   const tabs: [string, string, string][] = [
-    ['tab0', '军械库', '被动解锁即常驻 · 主动装入技能槽(最多 2 个)· 列表可上下拖动'],
+    ['tab0', '军械库', '被动可携带/取下(最多 6 件)· 主动装入技能槽(最多 2 个)· 列表可上下拖动'],
     ['tab1', '兵符', 'Boss 掉符片 · 集片铸符,每兵种一枚永久机制 · 列表可上下拖动'],
   ];
   tabs.forEach(([id, label], i) => {
@@ -382,11 +382,12 @@ function renderShop(): void {
   else renderShopFu();
 }
 
-/** 军械卡(单列大卡):被动常驻 / 主动装技能槽 / 未解锁可购。allowHit=false(卡片被裁剪)时不登记点击区 */
+/** 军械卡(单列大卡):已解锁的主动/被动都有一枚开关(装槽 / 携带),未解锁可购 */
 function drawGearCard(g: GearDef, i: number, y: number, allowHit: boolean): void {
   const x = 40, w = 640, h = SHOP_CARD_H;
   const owned = ownsGear(g.id);
-  const bagged = inBag(g.id);
+  // 「在编」高亮:主动 = 已装技能槽,被动 = 已携带(两者都是「本局会生效」)
+  const bagged = g.kind === 'passive' ? carriesGear(g.id) : inBag(g.id);
   const canUnlock = saveData.money >= g.cost;
   rr(x, y, w, h, 14);
   ctx.fillStyle = bagged ? '#3f3120' : PAPER;
@@ -425,7 +426,7 @@ function drawGearCard(g: GearDef, i: number, y: number, allowHit: boolean): void
   ctx.fillText(g.desc, x + 176, y + 82);
   ctx.fillStyle = bagged ? '#cdb98a' : '#8a7a5c';
   setFont(16, false);
-  ctx.fillText(g.kind === 'active' ? ('冷却 ' + (g.cd ?? 0) + 's · 整局反复用') : '解锁即常驻生效', x + 176, y + 106);
+  ctx.fillText(g.kind === 'active' ? ('冷却 ' + (g.cd ?? 0) + 's · 整局反复用') : ('被动 · 最多带 ' + GEAR_BAG.passiveCap + ' 件 · 可随时取下'), x + 176, y + 106);
   // 右侧:解锁 / 装入状态 / 常驻
   const bx = x + w - 200, bw = 180;
   if (!owned) {
@@ -446,7 +447,8 @@ function drawGearCard(g: GearDef, i: number, y: number, allowHit: boolean): void
     ctx.fillStyle = 'rgba(248,246,227,0.8)';
     ctx.fillText('解锁', bx + 126, y + h / 2 + 1);
     if (allowHit) state.uiButtons.push({ id: 'unlock', n: i, x: bx, y: by, w: bw, h: 58 });
-  } else if (g.kind === 'active') {
+  } else {
+    // 已解锁:一枚开关,主动 = 技能槽 / 被动 = 携带(样式一致,只是文案不同)
     const by = y + (h - 46) / 2;
     rr(bx, by, bw, 46, 12);
     ctx.fillStyle = bagged ? '#8a6a3a' : 'rgba(58,44,30,0.3)';
@@ -458,30 +460,31 @@ function drawGearCard(g: GearDef, i: number, y: number, allowHit: boolean): void
     ctx.textBaseline = 'middle';
     ctx.fillStyle = bagged ? '#fdf6e3' : '#8a7a5c';
     setFont(19, true);
-    ctx.fillText(bagged ? '已装 · 点此取出' : '未携带 · 点此装入', bx + bw / 2, y + h / 2 + 1);
+    const label = g.kind === 'active'
+      ? (bagged ? '已装 · 点此取出' : '未携带 · 点此装入')
+      : (bagged ? '已携带 · 点此取下' : '未携带 · 点此携带');
+    ctx.fillText(label, bx + bw / 2, y + h / 2 + 1);
     if (allowHit) state.uiButtons.push({ id: 'gear', n: i, x, y, w, h });
-  } else {
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#1f6a7a';
-    setFont(22, true);
-    ctx.fillText('✦ 常驻生效', bx + bw / 2, y + h / 2 + 1);
   }
   ctx.textBaseline = 'alphabetic';
 }
 
-/** 页签一:军械库(单列大卡片 + 上下滑动;被动常驻,主动装技能槽) */
+/** 页签一:军械库(单列大卡片 + 上下滑动;主动装技能槽,被动携带,都可点卡片切换) */
 function renderGear(): void {
-  // 顶部:主动技能槽(局内生成独立按钮)
+  // 顶部:左 = 主动技能槽(局内生成独立按钮),右 = 被动军械(携带生效;两池各算各的)
   const list = bagList();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#e3cfa4';
   setFont(21, true);
   ctx.fillText('主动技能槽 ' + bagActiveCount() + ' / ' + GEAR_BAG.activeCap, 40, 312);
+  // 说明文字夹在两池中间的空档(旧版挤在右上角,与「被动军械 N / M」叠字)
   ctx.fillStyle = '#b9a97e';
   setFont(14, false);
-  ctx.fillText('局内生成独立技能按钮', 262, 313);
+  ctx.fillText('局内生成独立按钮', 206, 313);
+  ctx.fillStyle = '#e3cfa4';
+  setFont(21, true);
+  ctx.fillText('被动军械 ' + passiveCarryCount() + ' / ' + GEAR_BAG.passiveCap, 340, 312);
   const SZ = 50, SY = 324;
   for (let j = 0; j < GEAR_BAG.activeCap; j++) {
     const x = 40 + j * 58;
@@ -508,30 +511,39 @@ function renderGear(): void {
       ctx.setLineDash([]);
     }
   }
-  // 顶部右:被动军械(解锁即常驻)
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#e3cfa4';
-  setFont(21, true);
-  ctx.fillText('被动军械 ' + passiveCount() + ' 件', 200, 312);
+  // 被动徽记行:已携带的按注册表序排开,余下画空槽(与左侧技能槽同一套读法)
   ctx.fillStyle = '#b9a97e';
   setFont(14, false);
-  ctx.fillText('解锁即常驻,不限数', 200, 340);
+  ctx.fillText('已解锁 ' + passiveOwnedCount() + ' 件 · 点徽记可取下', 340, 372);
+  const P_SZ = 34, P_Y = SY + 8;
+  const carry = passiveList();
   let px = 340;
-  for (const g of GEAR) {
-    if (g.kind !== 'passive' || !ownsGear(g.id)) continue;
-    rr(px, SY + 8, 34, 34, 8);
-    ctx.fillStyle = '#6d4c41';
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#c9a227';
-    ctx.stroke();
-    ctx.fillStyle = '#fdf6e3';
-    setFont(18, true);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(g.glyph, px + 17, SY + 26);
-    px += 40;
+  for (let j = 0; j < GEAR_BAG.passiveCap; j++) {
+    const gg = carry[j] ? gearOf(carry[j]) : undefined;
+    rr(px, P_Y, P_SZ, P_SZ, 8);
+    if (gg) {
+      ctx.fillStyle = '#6d4c41';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#c9a227';
+      ctx.stroke();
+      ctx.fillStyle = '#fdf6e3';
+      setFont(18, true);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(gg.glyph, px + P_SZ / 2, P_Y + P_SZ / 2 + 1);
+      // 与左侧技能槽同一读法:点徽记 = 取下(卡片上的开关是同一个动作)
+      state.uiButtons.push({ id: 'gear', n: GEAR.findIndex(q => q.id === carry[j]), x: px, y: P_Y, w: P_SZ, h: P_SZ });
+    } else {
+      ctx.fillStyle = 'rgba(58,44,30,0.25)';
+      ctx.fill();
+      ctx.setLineDash([6, 5]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#8a7a5c';
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    px += P_SZ + 6;
   }
 
   // —— 列表:单列卡片,裁剪 + 滚动 ——
@@ -553,7 +565,7 @@ function renderGear(): void {
   ctx.fillStyle = '#cdbf9f';
   setFont(15, false);
   ctx.textAlign = 'center';
-  ctx.fillText('上下拖动列表可滑动 · 被动解锁即常驻,主动最多装 2 个(局内可反复点击)', 360, 1272);
+  ctx.fillText('上下拖动列表可滑动 · 被动可携带/取下(最多 ' + GEAR_BAG.passiveCap + ' 件)· 主动最多装 ' + GEAR_BAG.activeCap + ' 个', 360, 1272);
 }
 
 /** 兵符卡(单列大卡):符印 / 名称 / 机制 / 流派 / 铸符键。allowHit=false(被裁剪)时不登记点击区 */

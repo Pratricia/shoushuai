@@ -16,7 +16,7 @@
 
     **段位越高,对方「有备而来」的下限越高**:保底件数按我方段位分八档
     (兵卒近乎裸奔 → 元帅整池军械 + 四枚兵符),再各五成概率多带一件。
-    仍是玩家同款上限(被动不限 · 主动 ≤ GEAR_BAG.activeCap · 兵符看池),
+    仍是玩家同款上限(被动 ≤ GEAR_BAG.passiveCap · 主动 ≤ GEAR_BAG.activeCap · 兵符看池),
     所以段位涨的是「对手的牌面」,不是「对手的数值」。
 
     调 AI 强弱:改预设参数 / 改 AI_FLOOR 段位档 / 改 config.ts 的 DUEL。
@@ -99,7 +99,7 @@ export interface AiLoadoutFloor {
 /** 段位 → 对方开局「有备而来」的保底件数(八档,与 RANKS 一一对应)
  *    兵卒 只 1 被动 1 主动、兵符保底 0     (对面也就个新兵蛋子)
  *    元帅 整池军械 + 四枚兵符             (对面也是老兵,牌面给足)
- *  仍是玩家同款上限:被动不限(池 3)、主动 ≤ GEAR_BAG.activeCap、兵符看池。 */
+ *  仍是玩家同款上限:被动 ≤ GEAR_BAG.passiveCap(池 3)、主动 ≤ GEAR_BAG.activeCap、兵符看池。 */
 const AI_FLOOR: AiLoadoutFloor[] = [
   { passive: 1, active: 1, fu: 0 },   // 兵卒
   { passive: 1, active: 1, fu: 1 },   // 伍长
@@ -117,7 +117,7 @@ export function aiLoadoutFloor(tier: number): AiLoadoutFloor {
 }
 
 /** 抽一套流派 + 军械/兵符:件数 = 段位保底 + 五成概率再多一件(上限仍是玩家同款:
- *  被动看池 · 主动 ≤ GEAR_BAG.activeCap · 兵符看池)。tier = 我方当前段位。 */
+ *  被动 ≤ GEAR_BAG.passiveCap(池 3)· 主动 ≤ GEAR_BAG.activeCap · 兵符看池)。tier = 我方当前段位。 */
 export function rollAiLoadout(tier = 0): { preset: AiPreset; loadout: AiLoadout } {
   const preset = AI_PRESETS[Math.floor(Math.random() * AI_PRESETS.length)];
   const f = aiLoadoutFloor(tier);
@@ -125,7 +125,7 @@ export function rollAiLoadout(tier = 0): { preset: AiPreset; loadout: AiLoadout 
   return {
     preset,
     loadout: {
-      passive: pickN(preset.passive, f.passive + bonus()),
+      passive: pickN(preset.passive, Math.min(GEAR_BAG.passiveCap, f.passive + bonus())),
       active: pickN(preset.active, Math.min(GEAR_BAG.activeCap, f.active + bonus())),
       fu: pickN(preset.fu, f.fu + bonus()),
     },

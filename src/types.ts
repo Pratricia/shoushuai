@@ -302,7 +302,7 @@ export interface GameState {
   moneyNote: string;         // 发饷缘由(首通犒赏 / 血战N波)
   rankUp: RankProgress | null;  // 对战:本局胜局触发的段位推进(结算页亮出;未升段也记录等级变化)
   bag: string[];             // 本局随身军械(开战按存档背包装载;主动技可点按钮反复用)
-  gearSet: Record<string, number>;  // 本棋盘已解锁军械(我方=存档;对战对方=随机预设)id -> 1
+  gearSet: Record<string, number>;  // 本棋盘生效的军械(我方 = 携带的被动 + 装槽的主动;对战对方 = 随机预设)id -> 1
   fuSet: Record<string, number>;    // 本棋盘已铸兵符(我方=存档;对战对方=随机预设)fuId -> 1
   gearCd: Record<string, number>;  // 主动军械冷却剩余秒数 id -> 剩余
   maxHearts: number;         // 本局帅血上限(灵药回复不超过此值)

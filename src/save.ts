@@ -6,10 +6,10 @@
    · 无限模式按活过波次计饷,大考波(5 的倍数)另加
    · 对战模式胜局计饷(活过波次 × 2 + 大考波 × 6 + 12;败局减半)
    消费:军械库(数据驱动,见 data/shop.ts)——军饷解锁即永久拥有;
-   被动军械解锁即常驻,主动军械需装进背包(技能槽 ≤ activeCap)才在局内生效。
+   被动军械解锁后**自行携带**(可取下,上限 passiveCap),主动军械需装进技能槽才能生效 ——「有」不等于「带」。
 
-   存档形态:gear = 已解锁军械;bag = 背包装备的主动军械序(数组,即技能按钮序)。
-   旧档(shop 等级 / inv 库存 / bag 计数)自动迁移为 gear + bag。
+   存档形态:gear = 已解锁军械;bag = 技能槽里的主动军械序(即技能按钮序);passiveBag = 携带的被动军械(只当集合用,展示恒按注册表序)。
+   旧档(shop 等级 / inv 库存 / bag 计数)自动迁移为 gear + bag;「被动解锁即常驻」时代的旧档,已解锁被动默认全部携带(超上限按注册表序截断)。
 
    读写纪律:模块加载即读档,变更后立即回写(单机小档,
    无批量事务需求);localStorage 不可用时静默降级为内存档。
@@ -25,7 +25,8 @@ export interface SaveData {
   money: number;                    // 军饷余额
   cleared: number[];                // 已通关关卡号(首通判定)
   gear: Record<string, number>;     // 已解锁军械 gearId -> 1(解锁即永久拥有)
-  bag: string[];                    // 背包装备的主动军械 id(有序,顺序即局内技能按钮序;被动不入包)
+  bag: string[];                    // 技能槽里的主动军械 id(有序,顺序即局内技能按钮序)
+  passiveBag: string[];             // 携带的被动军械 id(上限 GEAR_BAG.passiveCap,可随时取下)
   shards: number;                   // 符片(Boss 掉落,铸兵符用)
   fu: Record<string, number>;       // 已铸兵符 fuId -> 1(每兵种一枚)
   duelTier: number;                 // 对战段位序号(0 = 兵卒,RANKS 下标)
@@ -51,7 +52,7 @@ function load(): SaveData {
         const out: SaveData = {
           money: Math.max(0, Math.floor(d.money)),
           cleared: Array.isArray(d.cleared) ? d.cleared.filter((n: unknown) => typeof n === 'number') : [],
-          gear: {}, bag: [],
+          gear: {}, bag: [], passiveBag: [],
           shards: Math.max(0, Math.floor(d.shards ?? 0)),
           fu: (d.fu && typeof d.fu === 'object') ? d.fu : {},
           duelTier: Math.min(RANKS.length - 1, Math.max(0, Math.floor(d.duelTier ?? 0))),
@@ -78,11 +79,20 @@ function load(): SaveData {
         // 修剪:携带的必须已解锁且不重复
         const seen = new Set<string>();
         out.bag = out.bag.filter(id => out.gear[id] && !seen.has(id) && (seen.add(id), true));
+        // 被动携带:新档读 passiveBag;旧档(被动「解锁即常驻」时代)默认全带上
+        out.passiveBag = Array.isArray(d.passiveBag)
+          ? d.passiveBag.filter((id: unknown) => typeof id === 'string')
+          : GEAR.filter(g => g.kind === 'passive' && out.gear[g.id]).map(g => g.id);
+        // 修剪:必须已解锁、是被动、不重复,且不超上限(超出的仍留在库里,待玩家自行取舍)
+        const seenP = new Set<string>();
+        out.passiveBag = out.passiveBag
+          .filter(id => out.gear[id] && gearOf(id)?.kind === 'passive' && !seenP.has(id) && (seenP.add(id), true))
+          .slice(0, GEAR_BAG.passiveCap);
         return out;
       }
     }
   } catch { /* 档案损坏/环境受限:回退默认档 */ }
-  return { money: 0, cleared: [], gear: {}, bag: [], shards: 0, fu: {}, duelTier: 0, duelLevel: 1, duelWins: 0, duelLosses: 0 };
+  return { money: 0, cleared: [], gear: {}, bag: [], passiveBag: [], shards: 0, fu: {}, duelTier: 0, duelLevel: 1, duelWins: 0, duelLosses: 0 };
 }
 
 /** 全局存档单例(变更经下方函数走,保证即改即存) */
@@ -99,11 +109,26 @@ export function ownsGear(id: string): boolean {
   return (saveData.gear[id] ?? 0) > 0;
 }
 
-/** 已解锁的被动军械数(被动解锁即常驻,不占技能槽) */
-export function passiveCount(): number {
+/** 已解锁的被动军械数(库存件数,与「携带」无关) */
+export function passiveOwnedCount(): number {
   let n = 0;
   for (const k in saveData.gear) if (saveData.gear[k] > 0 && gearOf(k)?.kind === 'passive') n++;
   return n;
+}
+
+/** 已携带的被动军械(序恒按注册表 GEAR 序——被动之间无先后之分,展示稳定优先) */
+export function passiveList(): string[] {
+  return GEAR.filter(g => g.kind === 'passive' && ownsGear(g.id) && saveData.passiveBag.includes(g.id)).map(g => g.id);
+}
+
+/** 携带的被动军械数(受 GEAR_BAG.passiveCap 限制;对应局内那排徽记) */
+export function passiveCarryCount(): number {
+  return passiveList().length;
+}
+
+/** 某被动军械是否已携带(本局武装册只收携带的被动;「有」不等于「带」) */
+export function carriesGear(id: string): boolean {
+  return gearOf(id)?.kind === 'passive' && ownsGear(id) && saveData.passiveBag.includes(id);
 }
 
 /** 当前装入技能槽的主动军械(有序,已滤掉未解锁/非主动) */
@@ -121,7 +146,7 @@ export function bagActiveCount(): number {
   return bagList().length;
 }
 
-/** 解锁一件军械(扣军饷 + 永久拥有)。被动解锁即常驻;主动则自动占一个技能槽(有空槽时) */
+/** 解锁一件军械(扣军饷 + 永久拥有)。被动解锁即自动带上(带满则先留在库里);主动另占一个技能槽(有空槽时) */
 export function unlockGear(id: string, cost: number): boolean {
   if (ownsGear(id)) return false;
   if (saveData.money < cost) return false;
@@ -129,6 +154,8 @@ export function unlockGear(id: string, cost: number): boolean {
   saveData.gear[id] = 1;
   if (gearOf(id)?.kind === 'active' && bagActiveCount() < GEAR_BAG.activeCap) {
     saveData.bag.push(id);
+  } else if (gearOf(id)?.kind === 'passive' && passiveList().length < GEAR_BAG.passiveCap) {
+    saveData.passiveBag.push(id);
   }
   persist();
   return true;
@@ -149,6 +176,24 @@ export function unequipGear(id: string): boolean {
   const i = saveData.bag.indexOf(id);
   if (i < 0) return false;
   saveData.bag.splice(i, 1);
+  persist();
+  return true;
+}
+
+/** 携带一件被动军械:需已解锁、是被动、未携带、不超 passiveCap */
+export function equipPassive(id: string): boolean {
+  if (!ownsGear(id) || gearOf(id)?.kind !== 'passive' || carriesGear(id)) return false;
+  if (passiveList().length >= GEAR_BAG.passiveCap) return false;
+  saveData.passiveBag.push(id);
+  persist();
+  return true;
+}
+
+/** 取下已携带的被动军械(只是本局不生效;永久拥有不受影响,可随时再带上) */
+export function unequipPassive(id: string): boolean {
+  const i = saveData.passiveBag.indexOf(id);
+  if (i < 0) return false;
+  saveData.passiveBag.splice(i, 1);
   persist();
   return true;
 }
@@ -262,6 +307,7 @@ export function resetSave(): void {
   saveData.cleared = [];
   saveData.gear = {};
   saveData.bag = [];
+  saveData.passiveBag = [];
   saveData.shards = 0;
   saveData.fu = {};
   saveData.duelTier = 0;

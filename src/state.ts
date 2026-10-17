@@ -9,7 +9,7 @@ import { MAPS, getMap, DUEL_MAP_BOTTOM, DUEL_MAP_TOP, DUEL_PLAYER_PATHS, DUEL_RI
   DUEL_OPEN_PLAYER, DUEL_OPEN_RIVAL } from './data/maps';
 import { LEVELS, ENDLESS_OPEN } from './data/levels';
 import { getBoss } from './data/bosses';
-import { bagList, saveData, duelRankState } from './save';
+import { bagList, passiveList, saveData, duelRankState } from './save';
 import { gearOf } from './data/shop';
 import { FUS } from './data/fu';
 import type { FuDef } from './data/fu';
@@ -134,11 +134,14 @@ function resetBattle(map: MapDef, open: [number, number][], gold: number, hearts
   state.moneyGain = 0;
   state.moneyNote = '';
   state.rankUp = null;
-  // 技能槽:按存档装载主动军械(只有装进槽的主动技生效;被动军械解锁即常驻);冷却清零
-  // 武装册:本棋盘的军械与兵符(我方 = 存档;对战对方在 duelBoard 里覆盖为随机预设)
-  state.gearSet = { ...saveData.gear };
-  state.fuSet = { ...saveData.fu };
+  // 技能槽:按存档装载主动军械(只有装进槽的主动技生效)
+  // 武装册:本棋盘实际生效的军械 = 已携带的被动 + 已装槽的主动
+  // (对战对方在 duelBoard/setupDuel 里覆盖为随机预设;未携带的被动不进册 → 一律不生效)
   state.bag = bagList();
+  state.gearSet = {};
+  for (const id of passiveList()) state.gearSet[id] = 1;
+  for (const id of state.bag) state.gearSet[id] = 1;
+  state.fuSet = { ...saveData.fu };
   state.gearCd = {};
   state.drumT = 0;
   state.barracks = [null, null, null, null, null];

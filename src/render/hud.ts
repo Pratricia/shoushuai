@@ -8,7 +8,7 @@ import { draftCost } from '../systems/economy';
 import { endlessWaveInfo } from '../systems/waves';
 import { LEVELS } from '../data/levels';
 import { GEAR, gearOf } from '../data/shop';
-import { ownsGear } from '../save';
+import { carriesGear } from '../save';
 import { drawPiece, drawKenToken, discBase } from './units';
 import { clamp } from '../systems/geometry';
 import { pointer } from '../input';
@@ -214,11 +214,11 @@ export function drawBag(): void {
     state.uiButtons.push({ id: 'useGear', n: i, x, y, w, h });
   });
 
-  // 被动军械(解锁即常驻,不占技能槽):小徽记,不可点
+  // 被动军械(携带才生效,不占技能槽,取下即不生效):小徽记,不可点
   let px = BAG_BTN.x + state.bag.length * (BAG_BTN.w + BAG_BTN.gap) + 14;
   const sz = 42, py = BAG_BTN.y + (BAG_BTN.h - sz) / 2;
   for (const g of GEAR) {
-    if (g.kind !== 'passive' || !ownsGear(g.id)) continue;
+    if (g.kind !== 'passive' || !carriesGear(g.id)) continue;
     rr(px, py, sz, sz, 8);
     ctx.fillStyle = 'rgba(58,44,30,0.55)';
     ctx.fill();
