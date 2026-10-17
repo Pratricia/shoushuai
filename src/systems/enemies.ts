@@ -36,6 +36,20 @@ export function waveSpdMul(w0: number): number {
   return 1 + Math.min(ENDLESS.spdCap, ENDLESS.spdPerWave * w0);
 }
 
+/** 一兵出场时的数值(所有出怪路径共用一处,保证同波伏兵不会比正常出的兵更脆/更快)。
+ *  血/速 = 关卡层数(血+15%/关、速+2%/关)× 敌潮(随关内时间)× 波次爬坡;
+ *  - boss   :不吃敌潮、不吃波次提速——无限模式 Boss 强化全由 endlessBoss 克隆定义承担;
+ *             只有「战事升级」段(第 7 波起)是通用加压,Boss 一并跟上(lateMul),免得末段大考反成小菜
+ *  - spdTide:是否吃「敌潮提速」。常规出怪吃;Boss 与 Boss 埋伏的伏兵都不吃(沿用原有口径,勿顺手统一)
+ */
+function spawnStats(def: { hp: number; spd: number }, w0: number, boss: boolean, spdTide: boolean): { hp: number; maxHp: number; spd: number; tide: number } {
+  const tide = boss ? 1 : 1 + TIDE.hpPerSec * state.levelT;        // Boss 不吃敌潮(数值手调)
+  const tideSpd = (boss || !spdTide) ? 1 : 1 + TIDE.spdPerSec * state.levelT;
+  const hpMul = (1 + 0.15 * (state.level - 1)) * tide * (boss ? lateMul(w0) : waveMul(w0));
+  const spdMul = (1 + 0.02 * (state.level - 1)) * tideSpd * (boss ? 1 : waveSpdMul(w0));
+  return { hp: def.hp * hpMul, maxHp: def.hp * hpMul, spd: def.spd * spdMul, tide };
+}
+
 /** 出怪:随机选一条路线;成长 = 关卡间(血+15%/关、速+2%/关)× 关内敌潮(随 levelT 线性,Boss 除外)
  *  无限模式再叠乘波次系数(血量线性+二次 / 提速封顶),赏粮随波数缓涨
  *  「将」= Boss 类型:数值与技能取本关解析的 BossDef(state.boss) */
@@ -47,12 +61,7 @@ export function spawnEnemy(type: EnemyType): void {
     type === '将' ? bd! : ENEMIES[type];
   const endless = state.mode !== 'campaign';
   const w0 = endless ? Math.max(0, state.waveIdx) : 0;
-  const tide = isBoss ? 1 : 1 + TIDE.hpPerSec * state.levelT;      // Boss 不吃敌潮(数值手调)
-  const tideSpd = isBoss ? 1 : 1 + TIDE.spdPerSec * state.levelT;
-  // Boss 也不吃波次系数——无限模式 Boss 强化全部由 endlessBoss 克隆定义承担;
-  // 但「战事升级」段(第 7 波起)是通用加压, Boss 也一并跟上,免得末段大考反成小菜
-  const hpMul = (1 + 0.15 * (state.level - 1)) * tide * (isBoss ? lateMul(w0) : waveMul(w0));
-  const spdMul = (1 + 0.02 * (state.level - 1)) * tideSpd * (isBoss ? 1 : waveSpdMul(w0));
+  const { hp, maxHp, spd, tide } = spawnStats(def, w0, isBoss, true);
   const gold = def.gold + (endless && !isBoss ? Math.floor(w0 / ENDLESS.goldPer6) : 0);
   let path = state.paths[Math.floor(Math.random() * state.paths.length)];
   // 双车错:后出的那骑刻意换一条路(两路齐错);路线用尽才允许同行
@@ -64,8 +73,8 @@ export function spawnEnemy(type: EnemyType): void {
   const x = path[0].x + rand(-10, 10);
   state.enemies.push({
     type, x, y: path[0].y,
-    hp: def.hp * hpMul, maxHp: def.hp * hpMul,
-    spd: def.spd * spdMul, slowT: 0, kbT: 0, armorBreakT: 0, walkPh: Math.random() * Math.PI * 2,
+    hp, maxHp,
+    spd, slowT: 0, kbT: 0, armorBreakT: 0, walkPh: Math.random() * Math.PI * 2,
     pauseT: 0, dead: false,
     aimT: 0, aimX: 0, aimY: 0, shotDone: false, tide,
     r: def.r, gold, dmg: def.dmg, boss: bd,
@@ -149,17 +158,15 @@ function spawnMinionAt(e: Enemy, type: EnemyType): void {
   if (rest.length === 0) return;                      // 路将走完,不再埋伏
   const def = ENEMIES[type as Exclude<EnemyType, '将'>];
   const w0 = state.mode !== 'campaign' ? Math.max(0, state.waveIdx) : 0;
-  const tide = 1 + TIDE.hpPerSec * state.levelT;
-  const hpMul = (1 + 0.15 * (state.level - 1)) * tide * waveMul(w0);
+  const { hp, maxHp, spd, tide } = spawnStats(def, w0, false, false);
   const a = rand(0, Math.PI * 2);
   const x = clamp(e.x + Math.cos(a) * (e.r + 30), 40, 680);
   const y = Math.max(120, e.y + Math.sin(a) * (e.r + 16));
   const path: Point[] = [{ x, y }, ...rest];
   state.enemies.push({
     type, x, y,
-    hp: def.hp * hpMul, maxHp: def.hp * hpMul,
-    spd: def.spd * (1 + 0.02 * (state.level - 1)) * waveSpdMul(w0),
-    slowT: 0, kbT: 0, armorBreakT: 0, walkPh: rand(0, Math.PI * 2), pauseT: 0, dead: false,
+    hp, maxHp,
+    spd, slowT: 0, kbT: 0, armorBreakT: 0, walkPh: rand(0, Math.PI * 2), pauseT: 0, dead: false,
     aimT: 0, aimX: 0, aimY: 0, shotDone: false, tide,
     r: def.r, gold: def.gold, dmg: def.dmg, boss: null,
     path, wpi: 1,
