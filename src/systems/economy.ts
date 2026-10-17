@@ -3,7 +3,7 @@
    ============================================================ */
 import type { Piece, DraftType } from '../types';
 import { state, slotCenter } from '../state';
-import { DRAFT, KEN, KEN_BTN } from '../config';
+import { DRAFT, KEN, KEN_BTN, DRAFT_BTN, sellValue } from '../config';
 import { toast, addFloat } from './combat';
 
 /** 当前征兵费用:6 起步,每次涨价幅度递增 2(涨 2/4/6/8… → 6/8/12/18/26/36/48…) */
@@ -23,8 +23,18 @@ function weightedPick(weights: Record<string, number>): string {
   return Object.keys(weights)[0];
 }
 
-/** 补满兵营:5 格全新随机兵(旧子销毁)。征兵与援军令共用 */
+/** 补满兵营:5 格全新随机兵。留在槽里的旧子(棋子与字牌)按回收价自动折价成粮——
+ *  「征兵 = 汰旧换新」而不是销毁:玩家不用再为腾格子手动卖子,字牌也保底值 1 粮。
+ *  征兵与援军令共用本函数,折价口径一致(援军令是「换一班新兵」,旧部同样结饷离队) */
 export function refillBarracks(): void {
+  let back = 0;
+  for (const p of state.barracks) if (p) back += sellValue(p.lv);
+  if (back > 0) {
+    state.gold += back;
+    if (state.side !== 'rival') {   // 对战:对方兵营不在屏幕上,不弹飘字
+      addFloat(DRAFT_BTN.x + DRAFT_BTN.w / 2, DRAFT_BTN.y - 14, '旧部折价 +' + back + ' 粮', '#b8860b', 20);
+    }
+  }
   state.barracks = state.barracks.map((): Piece => ({
     type: weightedPick(DRAFT.weights) as DraftType,
     lv: 1, cd: 0, stunT: 0, c: -1, r: -1,
@@ -37,7 +47,7 @@ export function refillBarracks(): void {
   }
 }
 
-/** 征兵:一次补满兵营 5 格;兵营内的旧棋子被销毁、由新兵顶替
+/** 征兵:一次补满兵营 5 格;留在兵营的旧子按回收价自动折粮(见 refillBarracks)
  *  同时有几率掉落垦荒令(每关首次征兵必掉):拖到荒地格开辟布阵位 */
 export function tryDraft(): void {
   const cost = draftCost();
