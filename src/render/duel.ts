@@ -8,11 +8,11 @@
    帅血仍由 drawShuai 画在各自帅位下方(两座帅台对称)。
    ============================================================ */
 import { ctx, rr, setFont } from '../canvas';
-import { TAU, PAPER, INK, DUEL } from '../config';
+import { INK, DUEL, BAG_BTN } from '../config';
 import { state, duel } from '../state';
-import { BAG_BTN } from '../config';
 import { duelRankState } from '../save';
 import { levelCn, winsToPromote } from '../data/ranks';
+import { drawPauseBtn, drawSpeedBtn } from './hud';
 
 /** 顶栏双方战况:我方粮草/帅血 · 波次 · 敌方流派/粮草/帅血 · 暂停倍速 */
 export function drawDuelHud(): void {
@@ -53,24 +53,9 @@ export function drawDuelHud(): void {
   ctx.fillText('粮' + Math.floor(r.gold) + ' ❤' + Math.max(0, r.hearts)
     + ' · 械' + gears + '符' + duel.ai.loadout.fu.length, 604, 39);
 
-  // 暂停
-  ctx.beginPath();
-  ctx.arc(652, 26, 19, 0, TAU);
-  ctx.fillStyle = PAPER; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
-  ctx.fillStyle = INK;
-  ctx.fillRect(646, 19, 4, 14);
-  ctx.fillRect(654, 19, 4, 14);
-  state.uiButtons.push({ id: 'pause', x: 631, y: 3, w: 42, h: 46 });
-  // 倍速
-  ctx.beginPath();
-  ctx.arc(700, 26, 19, 0, TAU);
-  ctx.fillStyle = PAPER; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
-  setFont(17, true);
-  ctx.fillStyle = INK;
-  ctx.fillText('×' + state.speed, 700, 27);
-  state.uiButtons.push({ id: 'speed', x: 679, y: 3, w: 42, h: 46 });
+  // 右上角:暂停 / 倍速(与战役顶栏同一套键,只是顶栏矮 4px 故半径小 3)
+  drawPauseBtn(652, 26, 19, { id: 'pause', x: 631, y: 3, w: 42, h: 46 });
+  drawSpeedBtn(700, 26, 19, { id: 'speed', x: 679, y: 3, w: 42, h: 46 });
 
   drawBoatButton();
 }

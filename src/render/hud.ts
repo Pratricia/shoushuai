@@ -12,10 +12,41 @@ import { ownsGear } from '../save';
 import { drawPiece, drawKenToken, discBase } from './units';
 import { clamp } from '../systems/geometry';
 import { pointer } from '../input';
-import type { WaveGroup } from '../types';
+import type { WaveGroup, UIButton } from '../types';
 
 function waveText(groups: WaveGroup[]): string {
   return groups.map(g => g.t + '×' + g.n).join(' ');
+}
+
+/* ---------- 顶栏圆形图标键(战役 / 对战两套顶栏共用) ----------
+   两套顶栏高度不同(战役 56px、对战 52px),故圆心与半径由调用方给;
+   字形按半径等比推出(条宽 r/4、条高 r−5、字号 r−2),两处都复现原先的手写坐标。
+   唯一差别:倍速读数一律居中(对战那处原先受顶栏文字右对齐影响,读数略偏左)。 */
+
+/** 暂停键:圆底 + 双竖条 */
+export function drawPauseBtn(cx: number, cy: number, r: number, hit: UIButton): void {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fillStyle = PAPER; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+  ctx.fillStyle = INK;
+  const bw = Math.floor(r / 4), bh = r - 5, by = Math.round(cy - bh / 2);
+  ctx.fillRect(cx - bw - 2, by, bw, bh);
+  ctx.fillRect(cx + 2, by, bw, bh);
+  state.uiButtons.push(hit);
+}
+
+/** 倍速键:同底 + 当前倍速读数 */
+export function drawSpeedBtn(cx: number, cy: number, r: number, hit: UIButton): void {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fillStyle = PAPER; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+  setFont(r - 2, true);
+  ctx.fillStyle = INK;
+  ctx.textAlign = 'center';                       // 顶栏其余文字会改对齐,这里显式复位
+  ctx.fillText('×' + state.speed, cx, cy + 1);
+  state.uiButtons.push(hit);
 }
 
 /** 帅(路径终点,大棋子坐镇朱漆帅台之上)+ 帅血(居中于帅下方) */
@@ -240,28 +271,6 @@ export function drawHUD(): void {
       ctx.fillText('第' + state.level + '关 · 第' + (state.waveIdx + 1) + '/' + total + '波 · 敌' + state.enemies.length, 360, 30);
     }
   }
-  // 暂停
-  ctx.beginPath();
-  ctx.arc(602, 30, 22, 0, TAU);
-  ctx.fillStyle = PAPER;
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = INK;
-  ctx.stroke();
-  ctx.fillStyle = INK;
-  ctx.fillRect(595, 22, 5, 17);
-  ctx.fillRect(604, 22, 5, 17);
-  state.uiButtons.push({ id: 'pause', x: 576, y: 4, w: 52, h: 52 });
-  // 倍速
-  ctx.beginPath();
-  ctx.arc(656, 30, 22, 0, TAU);
-  ctx.fillStyle = PAPER;
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = INK;
-  ctx.stroke();
-  setFont(20, true);
-  ctx.fillStyle = INK;
-  ctx.fillText('×' + state.speed, 656, 31);
-  state.uiButtons.push({ id: 'speed', x: 630, y: 4, w: 52, h: 52 });
+  drawPauseBtn(602, 30, 22, { id: 'pause', x: 576, y: 4, w: 52, h: 52 });
+  drawSpeedBtn(656, 30, 22, { id: 'speed', x: 630, y: 4, w: 52, h: 52 });
 }
