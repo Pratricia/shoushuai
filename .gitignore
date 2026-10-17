@@ -1,0 +1,10 @@
+# 依赖与构建产物(可一键重建,不入库)
+node_modules/
+dist/
+
+# 编辑器 / 系统杂项
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
