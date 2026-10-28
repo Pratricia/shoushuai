@@ -7,7 +7,7 @@
 [![在线玩](https://img.shields.io/badge/%E5%9C%A8%E7%BA%BF%E7%8E%A9-%E5%AE%88%E5%B8%85-a93226?style=for-the-badge)](https://pratricia.github.io/shoushuai/)
 [![下载单文件](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD-%E5%AE%88%E5%B8%85.html-3a2f1b?style=for-the-badge)](./守帅.html)
 
-![封面](作品素材/封面-横版-战斗.png)
+![封面](https://pratricia.github.io/shoushuai/作品素材/封面-横版-战斗.png)
 
 零联网 · 零依赖 · 单文件 · 程序绘制零美术
 
@@ -58,7 +58,7 @@
 
 | 标题画面 | 战斗实况 |
 |:---:|:---:|
-| ![标题](作品素材/封面-标题画面-竖版.png) | ![战斗](作品素材/封面-战斗画面-竖版.png) |
+| ![标题](https://pratricia.github.io/shoushuai/作品素材/封面-标题画面-竖版.png) | ![战斗](https://pratricia.github.io/shoushuai/作品素材/封面-战斗画面-竖版.png) |
 
 <div align="center">
 
